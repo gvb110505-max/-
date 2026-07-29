@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>미니 게임 아케이드</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%;
+    background: linear-gradient(180deg, #12172a, #1c2440);
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .wrap { width: 100%; max-width: 640px; text-align: center; }
+  h1 { font-size: 28px; margin-bottom: 6px; letter-spacing: 1px; }
+  p.sub { opacity: 0.7; margin-bottom: 32px; font-size: 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  a.card {
+    display: block; text-decoration: none; color: #fff; text-align: left;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px; padding: 20px; transition: transform 0.15s, background 0.15s;
+  }
+  a.card:hover { transform: translateY(-2px); background: rgba(255,255,255,0.1); }
+  .card .emoji { font-size: 34px; margin-bottom: 10px; }
+  .card h2 { font-size: 18px; margin-bottom: 6px; }
+  .card p { font-size: 13px; opacity: 0.75; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>미니 게임 아케이드</h1>
+    <p class="sub">브라우저에서 바로 즐기는 게임 모음</p>
+    <div class="cards">
+      <a class="card" href="flappy-bird.html">
+        <div class="emoji">🐤</div>
+        <h2>플래피 버드</h2>
+        <p>클릭/탭으로 파이프 사이를 통과하는 클래식 아케이드 게임</p>
+      </a>
+      <a class="card" href="tactical-strike.html">
+        <div class="emoji">🎯</div>
+        <h2>스트라이크 프로토콜</h2>
+        <p>모바일 터치 조작 기반 1인칭 3D 택티컬 슈팅 프로토타입. 요원을 선택하고 봇을 전멸시키세요</p>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

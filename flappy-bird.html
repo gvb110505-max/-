@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>플래피 버드</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  #gameContainer {
+    position: relative;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    background: #70c5ce;
+    cursor: pointer;
+  }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.35);
+    user-select: none;
+  }
+  #overlay h1 {
+    font-size: 42px;
+    text-shadow: 3px 3px 0 #000;
+    color: #ffd23f;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+  #overlay p {
+    font-size: 16px;
+    margin: 6px 0;
+    text-shadow: 1px 1px 2px #000;
+  }
+  #overlay .hint {
+    margin-top: 20px;
+    font-size: 14px;
+    opacity: 0.85;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  #hud {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 40px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    pointer-events: none;
+    user-select: none;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="game" width="360" height="560"></canvas>
+    <div id="hud">0</div>
+    <div id="overlay">
+      <h1>플래피 버드</h1>
+      <p>클릭 / 탭 / 스페이스바로 날아오르기</p>
+      <p id="bestScore"></p>
+      <p class="hint">시작하려면 클릭하세요</p>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const hud = document.getElementById('hud');
+  const overlay = document.getElementById('overlay');
+  const bestScoreEl = document.getElementById('bestScore');
+
+  const STORAGE_KEY = 'flappy_best_score';
+  let bestScore = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+
+  const GROUND_HEIGHT = 80;
+  const GRAVITY = 0.45;
+  const FLAP_VELOCITY = -8;
+  const PIPE_WIDTH = 60;
+  const PIPE_GAP = 145;
+  const PIPE_SPACING = 190;
+  const PIPE_SPEED = 2.4;
+
+  const STATE = { READY: 'ready', PLAYING: 'playing', OVER: 'over' };
+  let state = STATE.READY;
+
+  let bird, pipes, score, frame, groundOffset, flashAlpha;
+
+  function resetGame() {
+    bird = {
+      x: 80,
+      y: H / 2 - 40,
+      w: 34,
+      h: 24,
+      velocity: 0,
+      rotation: 0,
+    };
+    pipes = [];
+    score = 0;
+    frame = 0;
+    groundOffset = 0;
+    flashAlpha = 0;
+    hud.textContent = '0';
+    spawnPipe(W + 80);
+    spawnPipe(W + 80 + PIPE_SPACING);
+    spawnPipe(W + 80 + PIPE_SPACING * 2);
+  }
+
+  function spawnPipe(x) {
+    const minTop = 50;
+    const maxTop = H - GROUND_HEIGHT - PIPE_GAP - 50;
+    const top = Math.floor(Math.random() * (maxTop - minTop)) + minTop;
+    pipes.push({ x, top, passed: false });
+  }
+
+  function flap() {
+    if (state === STATE.READY) {
+      state = STATE.PLAYING;
+      overlay.classList.add('hidden');
+      bird.velocity = FLAP_VELOCITY;
+    } else if (state === STATE.PLAYING) {
+      bird.velocity = FLAP_VELOCITY;
+    } else if (state === STATE.OVER) {
+      resetGame();
+      state = STATE.READY;
+      overlay.classList.remove('hidden');
+      bestScoreEl.textContent = bestScore > 0 ? `최고 점수: ${bestScore}` : '';
+    }
+  }
+
+  function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  function update() {
+    frame++;
+    groundOffset = (groundOffset - PIPE_SPEED) % 24;
+
+    if (state !== STATE.PLAYING) return;
+
+    bird.velocity += GRAVITY;
+    bird.y += bird.velocity;
+    bird.rotation = Math.max(-25, Math.min(90, bird.velocity * 4));
+
+    if (bird.y + bird.h >= H - GROUND_HEIGHT) {
+      bird.y = H - GROUND_HEIGHT - bird.h;
+      gameOver();
+    }
+    if (bird.y < 0) {
+      bird.y = 0;
+      bird.velocity = 0;
+    }
+
+    for (const pipe of pipes) {
+      pipe.x -= PIPE_SPEED;
+
+      const birdBox = { x: bird.x + 4, y: bird.y + 4, w: bird.w - 8, h: bird.h - 8 };
+      const topPipe = { x: pipe.x, y: 0, w: PIPE_WIDTH, h: pipe.top };
+      const bottomPipe = { x: pipe.x, y: pipe.top + PIPE_GAP, w: PIPE_WIDTH, h: H };
+
+      if (
+        rectsOverlap(birdBox.x, birdBox.y, birdBox.w, birdBox.h, topPipe.x, topPipe.y, topPipe.w, topPipe.h) ||
+        rectsOverlap(birdBox.x, birdBox.y, birdBox.w, birdBox.h, bottomPipe.x, bottomPipe.y, bottomPipe.w, bottomPipe.h)
+      ) {
+        gameOver();
+      }
+
+      if (!pipe.passed && pipe.x + PIPE_WIDTH < bird.x) {
+        pipe.passed = true;
+        score++;
+        hud.textContent = score;
+      }
+    }
+
+    if (pipes.length && pipes[0].x < -PIPE_WIDTH) {
+      pipes.shift();
+      const lastX = pipes[pipes.length - 1].x;
+      spawnPipe(lastX + PIPE_SPACING);
+    }
+  }
+
+  function gameOver() {
+    if (state === STATE.OVER) return;
+    state = STATE.OVER;
+    flashAlpha = 1;
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem(STORAGE_KEY, String(bestScore));
+    }
+    setTimeout(() => {
+      overlay.classList.remove('hidden');
+      overlay.querySelector('h1').textContent = '게임 오버';
+      overlay.querySelectorAll('p')[0].textContent = `점수: ${score}`;
+      bestScoreEl.textContent = `최고 점수: ${bestScore}`;
+      overlay.querySelector('.hint').textContent = '다시 시작하려면 클릭하세요';
+    }, 200);
+  }
+
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#70c5ce');
+    grad.addColorStop(1, '#a9e4ea');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // clouds
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    for (let i = 0; i < 3; i++) {
+      const cx = ((frame * 0.3 + i * 150) % (W + 100)) - 50;
+      const cy = 60 + i * 70;
+      drawCloud(cx, cy);
+    }
+  }
+
+  function drawCloud(x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, 18, 0, Math.PI * 2);
+    ctx.arc(x + 20, y - 8, 14, 0, Math.PI * 2);
+    ctx.arc(x + 36, y, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawPipes() {
+    for (const pipe of pipes) {
+      const capH = 24;
+      ctx.fillStyle = '#4caf50';
+      ctx.strokeStyle = '#2e7031';
+      ctx.lineWidth = 3;
+
+      // top pipe
+      ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
+      ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
+      ctx.fillRect(pipe.x - 4, pipe.top - capH, PIPE_WIDTH + 8, capH);
+      ctx.strokeRect(pipe.x - 4, pipe.top - capH, PIPE_WIDTH + 8, capH);
+
+      // bottom pipe
+      const bottomY = pipe.top + PIPE_GAP;
+      ctx.fillRect(pipe.x, bottomY, PIPE_WIDTH, H - GROUND_HEIGHT - bottomY);
+      ctx.strokeRect(pipe.x, bottomY, PIPE_WIDTH, H - GROUND_HEIGHT - bottomY);
+      ctx.fillRect(pipe.x - 4, bottomY, PIPE_WIDTH + 8, capH);
+      ctx.strokeRect(pipe.x - 4, bottomY, PIPE_WIDTH + 8, capH);
+    }
+  }
+
+  function drawGround() {
+    ctx.fillStyle = '#ded895';
+    ctx.fillRect(0, H - GROUND_HEIGHT, W, GROUND_HEIGHT);
+    ctx.fillStyle = '#c8b866';
+    ctx.fillRect(0, H - GROUND_HEIGHT, W, 10);
+
+    ctx.fillStyle = '#a89b52';
+    for (let x = groundOffset; x < W; x += 24) {
+      ctx.fillRect(x, H - GROUND_HEIGHT + 12, 14, 6);
+    }
+  }
+
+  function drawBird() {
+    ctx.save();
+    ctx.translate(bird.x + bird.w / 2, bird.y + bird.h / 2);
+    ctx.rotate((bird.rotation * Math.PI) / 180);
+
+    // body
+    ctx.fillStyle = '#ffd23f';
+    ctx.strokeStyle = '#e0a800';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bird.w / 2, bird.h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // wing
+    const wingFlap = Math.sin(frame * 0.4) * 4;
+    ctx.fillStyle = '#ffb703';
+    ctx.beginPath();
+    ctx.ellipse(-4, 2 + wingFlap, 9, 6, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(8, -4, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(9, -4, 2.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // beak
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath();
+    ctx.moveTo(14, -2);
+    ctx.lineTo(24, 1);
+    ctx.lineTo(14, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function draw() {
+    drawBackground();
+    drawPipes();
+    drawGround();
+    drawBird();
+
+    if (flashAlpha > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+      flashAlpha -= 0.08;
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  canvas.addEventListener('mousedown', flap);
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, { passive: false });
+  overlay.addEventListener('mousedown', flap);
+  overlay.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, { passive: false });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); flap(); }
+  });
+
+  bestScoreEl.textContent = bestScore > 0 ? `최고 점수: ${bestScore}` : '';
+  resetGame();
+  loop();
+})();
+</script>
+</body>
+</html>
