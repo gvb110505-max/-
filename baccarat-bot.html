@@ -51,6 +51,13 @@
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
   th{opacity:.6;font-weight:500}
+  .plist{display:flex;flex-direction:column;gap:6px}
+  .pit{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border-radius:8px;padding:7px 9px}
+  .pit .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;flex:0 0 auto}
+  .pit .tag.B{background:#d33a45}.pit .tag.P{background:#2f6fd0}.pit .tag.N{background:#5a6274}
+  .pit .nm{font-size:12.5px;font-weight:600;flex:0 0 auto}
+  .pit .ds{font-size:11.5px;opacity:.65;line-height:1.4}
+  .pit .wt{margin-left:auto;font-size:11px;opacity:.55;flex:0 0 auto}
   .roads{overflow-x:auto}
   .road{display:flex;gap:2px;margin-bottom:10px}
   .rcol{display:flex;flex-direction:column;gap:2px}
@@ -140,12 +147,17 @@
       </div>
 
       <div class="panel">
-        <h2>5. 패턴 통계</h2>
+        <h2>5. 감지된 패턴</h2>
+        <div class="plist" id="plist"></div>
+      </div>
+
+      <div class="panel">
+        <h2>6. 패턴 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>6. 성적 추적 (플랫 베팅 기준)</h2>
+        <h2>7. 성적 추적 (플랫 베팅 기준)</h2>
         <table id="perf"><tbody></tbody></table>
         <div class="hint">추천이 나온 뒤 실제 결과를 입력하면 적중률과 누적 손익(뱅커 5% 커미션 반영)을 계산합니다.</div>
       </div>
@@ -415,74 +427,174 @@ function derivedRoad(cols, k){
 }
 
 /* ---------------- 패턴 분석 ---------------- */
-function analyze(hist){
-  const nz = hist.filter(v=>v!=='T');
+const OPP = s => s === 'B' ? 'P' : 'B';
+
+/* 열 길이 주기 패턴에서 "현재 열의 예상 길이"를 뽑아
+   현재 길이와 비교해 유지/전환을 판정하는 공통 헬퍼 */
+function fromExpected(expected, cur, side){
+  return cur >= expected ? OPP(side) : side;
+}
+
+function detectPatterns(hist){
+  const nz = hist.filter(v => v !== 'T');
   const cols = bigRoadColumns(hist);
-  const nB = nz.filter(v=>v==='B').length, nP = nz.length-nB;
-  const nT = hist.length - nz.length;
+  const out = [];
+  if (!cols.length || nz.length < 6) return out;
 
-  // 현재 줄(streak)
-  const streak = cols.length ? cols[cols.length-1].items.length : 0;
-  const streakSide = cols.length ? cols[cols.length-1].side : null;
+  const L    = cols.map(c => c.items.length);
+  const done = L.slice(0, -1);          // 완성된 열
+  const cur  = L[L.length - 1];         // 진행 중인 열 길이
+  const side = cols[cols.length - 1].side;
+  const add = (name, s, w, desc) => out.push({name, side:s, w, desc});
+  const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const tail = n => done.slice(-n);
 
-  // 열 길이 분포로 "줄 유지 확률" 근사
-  const lens = cols.slice(0,-1).map(c=>c.items.length);
-  const cont = lens.filter(l=>l>streak).length, ended = lens.filter(l=>l===streak).length;
-  const contRate = (cont+ended) ? cont/(cont+ended) : null;
+  /* 1. 용 (Dragon) — 한 쪽이 4연속 이상 */
+  if (cur >= 4)
+    add(`용(Dragon) ${cur}연`, side, Math.min(0.45, 0.10 * (cur - 2)),
+        `${side==='B'?'뱅커':'플레이어'} ${cur}연속. 긴 줄은 끊길 때까지 따라가는 것이 정석`);
+  else if (cur === 3)
+    add('삼연(3연)', side, 0.14, '3연속 진행 중 — 용으로 이어질지 관찰 구간');
 
-  // 핑퐁(교대) 비율
-  let alt=0;
-  for (let i=1;i<nz.length;i++) if (nz[i]!==nz[i-1]) alt++;
-  const altRate = nz.length>1 ? alt/(nz.length-1) : 0;
+  /* 2. 핑퐁 (Ping Pong) — 한 칸짜리 열이 반복 */
+  if (tail(4).length === 4 && tail(4).every(v => v === 1) && cur === 1)
+    add('핑퐁(Ping Pong)', OPP(side), 0.32, '1칸 열이 4회 이상 반복 — 교대 흐름');
+  else if (tail(5).filter(v => v === 1).length >= 4 && cur === 1)
+    add('촙(Chop) 성향', OPP(side), 0.22, '최근 5열 중 4열이 1칸 — 잦은 교대 구간');
 
-  // 최근 4구간 마르코프 (n-gram, n=3)
-  const n = 3; const map = {};
-  for (let i=0;i+n<nz.length;i++){
-    const k = nz.slice(i,i+n).join('');
-    (map[k] = map[k] || {B:0,P:0})[nz[i+n]]++;
+  /* 3. 원투 / 투원 — 1-2-1-2 또는 2-1-2-1 주기 */
+  if (eq(tail(4), [1,2,1,2]) || eq(tail(4), [2,1,2,1])) {
+    const cyc = tail(4);
+    const expected = cyc[0];            // 4주기이므로 다음 열은 4칸 전과 동일
+    add(cyc[0] === 1 ? '원투(1-2)' : '투원(2-1)', fromExpected(expected, cur, side), 0.28,
+        `열 길이가 ${cyc.join('-')} 주기 — 이번 열 예상 ${expected}칸 (현재 ${cur}칸)`);
   }
-  const lastKey = nz.slice(-n).join('');
-  const ng = nz.length>n ? map[lastKey] : null;
 
-  // 파생로드 일치도 (세 길이 모두 같은 방향이면 강한 신호로 취급)
+  /* 4. 쌍줄 / 더블 (2-2-2) */
+  else if (tail(3).length === 3 && tail(3).every(v => v === 2))
+    add('쌍줄(2-2-2)', fromExpected(2, cur, side), 0.26, '2칸 열이 3회 연속 — 이번 열도 2칸 예상');
+
+  /* 5. 삼삼 (3-3) */
+  else if (tail(2).length === 2 && tail(2).every(v => v === 3))
+    add('삼삼(3-3)', fromExpected(3, cur, side), 0.22, '3칸 열이 연속 — 이번 열도 3칸 예상');
+
+  /* 6. 계단 / 역계단 */
+  const t3 = tail(3);
+  if (t3.length === 3 && t3[1] === t3[0] + 1 && t3[2] === t3[1] + 1)
+    add('계단(오름)', fromExpected(t3[2] + 1, cur, side), 0.20,
+        `열 길이가 ${t3.join('→')}로 증가 — 이번 열 ${t3[2]+1}칸 예상`);
+  if (t3.length === 3 && t3[1] === t3[0] - 1 && t3[2] === t3[1] - 1 && t3[2] >= 1)
+    add('계단(내림)', fromExpected(Math.max(1, t3[2] - 1), cur, side), 0.20,
+        `열 길이가 ${t3.join('→')}로 감소 — 이번 열 ${Math.max(1,t3[2]-1)}칸 예상`);
+
+  /* 7. 짝수줄 / 홀수줄 편향 */
+  const t6 = tail(6);
+  if (t6.length === 6) {
+    if (t6.every(v => v % 2 === 0))
+      add('짝수줄 편향', cur % 2 === 1 ? side : OPP(side), 0.18, '최근 6열이 모두 짝수 칸');
+    else if (t6.every(v => v % 2 === 1))
+      add('홀수줄 편향', cur % 2 === 0 ? side : OPP(side), 0.18, '최근 6열이 모두 홀수 칸');
+  }
+
+  /* 8. 같은 열 길이 반복 (한줄떡 등 임의 길이) */
+  const t4 = tail(4);
+  if (t4.length === 4 && t4.every(v => v === t4[0]) && t4[0] >= 3)
+    add(`${t4[0]}줄 반복`, fromExpected(t4[0], cur, side), 0.24,
+        `${t4[0]}칸 열이 4회 연속 — 매우 규칙적인 구간`);
+
+  /* 9. 가변차수 반복 패턴 (order 6→2 백오프) */
+  for (let n = 6; n >= 2; n--) {
+    if (nz.length < n + 4) continue;
+    const key = nz.slice(-n).join('');
+    let hitB = 0, hitP = 0;
+    for (let i = 0; i + n < nz.length; i++)
+      if (nz.slice(i, i + n).join('') === key) (nz[i + n] === 'B' ? hitB++ : hitP++);
+    const tot = hitB + hitP;
+    if (tot >= 3 && hitB !== hitP) {
+      const bias = (hitB - hitP) / tot;
+      add(`반복 패턴 ${n}구간`, bias > 0 ? 'B' : 'P', Math.min(0.30, Math.abs(bias) * 0.30 + tot * 0.02),
+          `"${key}" 이후 과거 ${tot}회 → 뱅커 ${hitB} / 플레이어 ${hitP}`);
+      break;
+    }
+  }
+
+  /* 10. 줄 꺾임 통계 — 현재 길이에서 실제로 연장됐던 비율 */
+  const contN = done.filter(l => l >  cur).length;
+  const endN  = done.filter(l => l === cur).length;
+  if (contN + endN >= 4) {
+    const rate = contN / (contN + endN);
+    if (Math.abs(rate - 0.5) > 0.12)
+      add('줄 연장 통계', rate > 0.5 ? side : OPP(side), Math.min(0.25, Math.abs(rate - 0.5) * 0.6),
+          `이 슈에서 ${cur}칸 열이 더 길어진 비율 ${(rate*100).toFixed(0)}% (표본 ${contN+endN})`);
+  }
+
+  /* 11. 슈 편향 — 한 쪽이 크게 앞선 슈 */
+  const nB = nz.filter(v => v === 'B').length, nP = nz.length - nB;
+  if (nz.length >= 20) {
+    const bias = (nB - nP) / nz.length;
+    if (Math.abs(bias) > 0.20)
+      add('슈 편향', bias > 0 ? 'B' : 'P', Math.min(0.22, Math.abs(bias) * 0.5),
+          `이 슈 ${nz.length}판에서 ${bias>0?'뱅커':'플레이어'}가 ${Math.abs(nB-nP)}판 우세`);
+  }
+
+  /* 12. 대칭(미러) — 최근 4판이 그 직전 4판의 역순 */
+  if (nz.length >= 8) {
+    const a = nz.slice(-4), b = nz.slice(-8, -4).slice().reverse();
+    if (eq(a, b)) add('대칭(미러)', OPP(nz[nz.length - 5]), 0.16, '최근 4판이 직전 4판의 거울상');
+  }
+
+  /* 13. 파생로드 3색 일치 */
   const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
-  const dLast = [beb,sr,cp].map(a=>a[a.length-1]).filter(Boolean);
-  const dRed = dLast.filter(v=>v==='R').length;
-
-  /* 점수 합산: +는 뱅커, -는 플레이어 방향 */
-  let score = 0; const reasons = [];
-  score += 0.06; reasons.push('뱅커 하우스 엣지 우위(-1.06% vs -1.24%)');
-
-  if (streak >= 3 && streakSide){
-    const w = Math.min(0.5, 0.12*(streak-2));
-    score += (streakSide==='B' ? w : -w);
-    reasons.push(`현재 ${streakSide==='B'?'뱅커':'플레이어'} ${streak}연승 진행 중` +
-      (contRate!=null ? ` (과거 같은 길이에서 연장 ${(contRate*100).toFixed(0)}%)` : ''));
-  }
-  if (altRate > 0.62 && streak === 1 && streakSide){
-    const opp = streakSide==='B' ? -0.3 : 0.3;
-    score += opp;
-    reasons.push(`핑퐁 성향 강함(교대율 ${(altRate*100).toFixed(0)}%) → 반대편`);
-  }
-  if (ng && (ng.B+ng.P) >= 4){
-    const tot = ng.B+ng.P, bias = (ng.B-ng.P)/tot;
-    score += bias*0.35;
-    reasons.push(`최근 3구간 "${lastKey}" 이후 표본 ${tot}회 → B ${ng.B} / P ${ng.P}`);
-  }
-  if (dLast.length === 3){
-    const dir = dRed>=2 ? 1 : -1;   // 빨강 우세 = 현재 흐름 유지
-    const side = streakSide==='B' ? 1 : -1;
-    score += dir*side*0.22;
-    reasons.push(`파생로드 빨강 ${dRed}/3 → 흐름 ${dRed>=2?'유지':'전환'} 신호`);
+  const dLast = [beb, sr, cp].map(a => a[a.length - 1]).filter(Boolean);
+  if (dLast.length === 3) {
+    const red = dLast.filter(v => v === 'R').length;
+    if (red === 3 || red === 0)
+      add('파생로드 3색 일치', red === 3 ? side : OPP(side), 0.26,
+          `큰눈길·작은길·바퀴벌레길이 모두 ${red===3?'빨강(흐름 유지)':'파랑(흐름 전환)'}`);
+    else
+      add('파생로드 우세', red >= 2 ? side : OPP(side), 0.12,
+          `파생로드 빨강 ${red}/3 — ${red>=2?'유지':'전환'} 쪽 우세`);
   }
 
-  const conf = Math.min(1, Math.abs(score)/0.8);
+  /* 14. 타이 밀집 */
+  const last12 = hist.slice(-12), tCnt = last12.filter(v => v === 'T').length;
+  if (tCnt >= 2)
+    add('타이 밀집 주의', side, 0.0,
+        `최근 12판에 타이 ${tCnt}회 — 타이는 하우스 엣지 -14.4%로 베팅 비추천`);
+
+  return out;
+}
+
+function analyze(hist){
+  const nz = hist.filter(v => v !== 'T');
+  const cols = bigRoadColumns(hist);
+  const nB = nz.filter(v => v === 'B').length, nP = nz.length - nB;
+  const nT = hist.length - nz.length;
+  const streak = cols.length ? cols[cols.length - 1].items.length : 0;
+  const streakSide = cols.length ? cols[cols.length - 1].side : null;
+
+  let alt = 0;
+  for (let i = 1; i < nz.length; i++) if (nz[i] !== nz[i-1]) alt++;
+  const altRate = nz.length > 1 ? alt / (nz.length - 1) : 0;
+
+  const lens = cols.slice(0, -1).map(c => c.items.length);
+  const cont = lens.filter(l => l > streak).length, ended = lens.filter(l => l === streak).length;
+  const contRate = (cont + ended) ? cont / (cont + ended) : null;
+
+  const patterns = detectPatterns(hist);
+
+  /* 점수 합산: + = 뱅커, - = 플레이어 */
+  let score = 0.06;                       // 뱅커 하우스 엣지 우위
+  for (const p of patterns) score += (p.side === 'B' ? p.w : -p.w);
+
+  const conf = Math.min(1, Math.abs(score) / 0.9);
   let pick;
   if (hist.length < 8) pick = 'SKIP';
-  else if (Math.abs(score) < 0.10) pick = 'B';   // 신호 없음 → 기본값은 엣지가 낮은 뱅커
+  else if (Math.abs(score) < 0.10) pick = 'B';
   else pick = score > 0 ? 'B' : 'P';
 
-  return {pick, conf, reasons, nB, nP, nT, streak, streakSide, altRate, contRate, cols, beb, sr, cp, score};
+  const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
+  return {pick, conf, patterns, nB, nP, nT, streak, streakSide, altRate, contRate, cols, beb, sr, cp, score};
 }
 
 /* ---------------- 렌더 ---------------- */
@@ -500,10 +612,20 @@ function render(){
   pickEl.textContent = names[a.pick];
   pickEl.style.color = a.pick==='B' ? '#ff7b85' : a.pick==='P' ? '#79aaff' : '#aab';
   document.getElementById('confBar').style.width = (a.conf*100).toFixed(0)+'%';
+  const sig = a.patterns.filter(p => p.w > 0);
   document.getElementById('why').innerHTML = hist.length < 8
     ? '표본이 8판 미만입니다. 관망을 권장합니다.'
-    : `신뢰도 ${(a.conf*100).toFixed(0)}% · 점수 ${a.score.toFixed(2)}<br>· ` + a.reasons.join('<br>· ')
-      + '<br><span style="opacity:.6">※ 이 신뢰도는 패턴 일관성 지표일 뿐, 적중 확률이 아닙니다.</span>';
+    : `감지된 패턴 ${sig.length}개 · 종합점수 ${a.score.toFixed(2)} · 신뢰도 ${(a.conf*100).toFixed(0)}%`
+      + (sig.length ? `<br>주요 근거: ${sig.slice().sort((x,y)=>y.w-x.w).slice(0,3).map(p=>p.name).join(', ')}` : '<br>뚜렷한 패턴 없음 — 기본값(뱅커)')
+      + '<br><span style="opacity:.6">※ 신뢰도는 패턴 일관성 지표일 뿐, 적중 확률이 아닙니다.</span>';
+
+  const pl = document.getElementById('plist');
+  pl.innerHTML = a.patterns.length ? a.patterns.map(p => `
+    <div class="pit">
+      <span class="tag ${p.w>0?p.side:'N'}">${p.w>0?(p.side==='B'?'뱅커':'플레이어'):'참고'}</span>
+      <div><div class="nm">${p.name}</div><div class="ds">${p.desc}</div></div>
+      <span class="wt">${p.w>0?'가중치 '+p.w.toFixed(2):'-'}</span>
+    </div>`).join('') : '<div class="ds" style="opacity:.5;font-size:12px">아직 감지된 패턴이 없습니다 (최소 6판 필요)</div>';
 
   const tot = a.nB + a.nP;
   document.querySelector('#stats tbody').innerHTML = `
