@@ -27,7 +27,20 @@
         border-radius:6px;padding:4px 6px;font-size:12px;margin-right:10px}
   #stage{position:relative;display:inline-block;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
   #video{display:block;max-width:100%;max-height:340px}
-  #sel{position:absolute;border:2px dashed #45e08a;background:rgba(69,224,138,.12);pointer-events:none;display:none}
+  #sel{position:absolute;border:2px solid #45e08a;background:rgba(69,224,138,.10);display:none;
+        cursor:move;touch-action:none;box-shadow:0 0 0 9999px rgba(0,0,0,.35)}
+  #sel .h{position:absolute;width:16px;height:16px;background:#45e08a;border:2px solid #0e1220;
+        border-radius:3px;touch-action:none}
+  #sel .h.nw{left:-9px;top:-9px;cursor:nwse-resize}
+  #sel .h.n {left:calc(50% - 8px);top:-9px;cursor:ns-resize}
+  #sel .h.ne{right:-9px;top:-9px;cursor:nesw-resize}
+  #sel .h.e {right:-9px;top:calc(50% - 8px);cursor:ew-resize}
+  #sel .h.se{right:-9px;bottom:-9px;cursor:nwse-resize}
+  #sel .h.s {left:calc(50% - 8px);bottom:-9px;cursor:ns-resize}
+  #sel .h.sw{left:-9px;bottom:-9px;cursor:nesw-resize}
+  #sel .h.w {left:-9px;top:calc(50% - 8px);cursor:ew-resize}
+  #sel .lbl{position:absolute;left:0;top:-19px;font-size:11px;color:#45e08a;white-space:nowrap;
+        background:rgba(0,0,0,.6);padding:1px 5px;border-radius:4px}
   #gridOverlay{position:absolute;left:0;top:0;pointer-events:none}
   .hint{font-size:12px;opacity:.6;margin-top:8px;line-height:1.6}
   .rec{text-align:center;padding:14px 10px;border-radius:10px;background:rgba(0,0,0,.3)}
@@ -70,6 +83,7 @@
         <h2>1. 화면 공유 & 영역 지정</h2>
         <button id="btnShare">화면 공유 시작</button>
         <button id="btnStop" class="ghost" disabled>중지</button>
+        <button id="btnBox" class="ghost" disabled>영역 상자 만들기</button>
         <button id="btnScan" class="ghost" disabled>자동 판독 시작</button>
         <div style="margin:8px 0">
           <label>행</label><input type="number" id="rows" value="6" min="2" max="12">
@@ -79,11 +93,19 @@
         <div id="stage">
           <video id="video" autoplay muted playsinline></video>
           <canvas id="gridOverlay"></canvas>
-          <div id="sel"></div>
+          <div id="sel">
+            <div class="lbl" id="selLbl"></div>
+            <div class="h nw" data-d="nw"></div><div class="h n" data-d="n"></div>
+            <div class="h ne" data-d="ne"></div><div class="h e" data-d="e"></div>
+            <div class="h se" data-d="se"></div><div class="h s" data-d="s"></div>
+            <div class="h sw" data-d="sw"></div><div class="h w" data-d="w"></div>
+          </div>
         </div>
         <div class="hint">
-          공유 후 영상 위에서 <b>빅로드(큰 눈길) 격자 영역을 드래그</b>해 지정하세요.
-          행/열 수를 화면의 실제 격자와 맞추면 판독 정확도가 올라갑니다.
+          <b>영역 상자 만들기</b>를 누르면 초록 상자가 나타납니다.
+          상자 <b>안쪽을 끌면 이동</b>, <b>모서리·변의 네모 손잡이를 끌면 크기 조절</b>입니다.
+          (상자를 선택한 뒤 <b>방향키</b>로 1px 미세 이동, <b>Shift+방향키</b>로 크기 조절도 됩니다.)
+          로드맵 격자를 딱 감싸도록 맞추고, 행/열 수를 실제 칸 수와 맞추세요.
           색 판별: 빨강=뱅커, 파랑=플레이어, 초록=타이.
         </div>
       </div>
@@ -155,6 +177,7 @@ document.getElementById('btnShare').onclick = async () => {
     S.stream.getVideoTracks()[0].addEventListener('ended', stopShare);
     document.getElementById('btnStop').disabled = false;
     document.getElementById('btnScan').disabled = false;
+    document.getElementById('btnBox').disabled = false;
   } catch(e) { alert('화면 공유를 시작하지 못했습니다: ' + e.message); }
 };
 document.getElementById('btnStop').onclick = stopShare;
@@ -164,35 +187,97 @@ function stopShare(){
   S.stream = null; video.srcObject = null;
   document.getElementById('btnStop').disabled = true;
   document.getElementById('btnScan').disabled = true;
+  document.getElementById('btnBox').disabled = true;
   document.getElementById('btnScan').textContent = '자동 판독 시작';
 }
 
-/* 영역 드래그 선택 */
+/* ---------------- 영역 상자 (이동 / 크기 조절) ---------------- */
+const selLbl = document.getElementById('selLbl');
+let box = null;            // {x,y,w,h} — 화면 표시 좌표 (video 좌상단 기준)
+let act = null;            // 진행 중인 조작
+
+function videoRect(){ return video.getBoundingClientRect(); }
+
+function applyBox(){
+  if (!box) { selBox.style.display='none'; S.region=null; return; }
+  const r = videoRect();
+  // 영상 밖으로 나가지 않도록 보정
+  box.w = Math.max(24, Math.min(box.w, r.width));
+  box.h = Math.max(24, Math.min(box.h, r.height));
+  box.x = Math.max(0, Math.min(box.x, r.width  - box.w));
+  box.y = Math.max(0, Math.min(box.y, r.height - box.h));
+  Object.assign(selBox.style, {display:'block', left:box.x+'px', top:box.y+'px',
+                               width:box.w+'px', height:box.h+'px'});
+  const sx = video.videoWidth / r.width, sy = video.videoHeight / r.height;
+  S.region = {x:box.x*sx, y:box.y*sy, w:box.w*sx, h:box.h*sy};
+  const rows = +document.getElementById('rows').value, cols = +document.getElementById('cols').value;
+  selLbl.textContent = `${Math.round(box.w)}×${Math.round(box.h)}px · ${cols}열 ${rows}행`;
+  drawOverlay(box.x, box.y, box.w, box.h);
+}
+
+document.getElementById('btnBox').onclick = () => {
+  const r = videoRect();
+  // 기본 크기: 마우스 커서 하나 정도(약 20px)에서 시작 → 손잡이로 키우세요
+  const w = 22, h = 22;
+  box = {x:(r.width-w)/2, y:(r.height-h)/2, w, h};
+  applyBox();
+  selBox.focus();
+};
+
+// 상자 안쪽 = 이동, 손잡이 = 크기 조절
+selBox.addEventListener('pointerdown', e => {
+  if (!box) return;
+  e.preventDefault(); e.stopPropagation();
+  const dir = e.target.dataset ? e.target.dataset.d : null;
+  act = {dir: dir || 'move', sx:e.clientX, sy:e.clientY, o:{...box}};
+  e.target.setPointerCapture(e.pointerId);
+});
+selBox.addEventListener('pointermove', e => {
+  if (!act) return;
+  const dx = e.clientX - act.sx, dy = e.clientY - act.sy, o = act.o, d = act.dir;
+  if (d === 'move') { box.x = o.x + dx; box.y = o.y + dy; }
+  else {
+    if (d.includes('w')) { box.x = o.x + dx; box.w = o.w - dx; }
+    if (d.includes('e')) { box.w = o.w + dx; }
+    if (d.includes('n')) { box.y = o.y + dy; box.h = o.h - dy; }
+    if (d.includes('s')) { box.h = o.h + dy; }
+    if (box.w < 24) { box.w = 24; if (d.includes('w')) box.x = o.x + o.w - 24; }
+    if (box.h < 24) { box.h = 24; if (d.includes('n')) box.y = o.y + o.h - 24; }
+  }
+  applyBox();
+});
+selBox.addEventListener('pointerup', () => { act = null; });
+selBox.addEventListener('pointercancel', () => { act = null; });
+
+// 방향키 미세 조정 (Shift = 크기)
+selBox.tabIndex = 0;
+selBox.addEventListener('keydown', e => {
+  if (!box) return;
+  const step = e.altKey ? 10 : 1;
+  const map = {ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1]};
+  const m = map[e.key]; if (!m) return;
+  e.preventDefault();
+  if (e.shiftKey) { box.w += m[0]*step; box.h += m[1]*step; }
+  else            { box.x += m[0]*step; box.y += m[1]*step; }
+  applyBox();
+});
+
+// 영상 위 드래그로 한 번에 그리기 (기존 방식도 유지)
 let drag = null;
 video.addEventListener('pointerdown', e => {
-  const r = video.getBoundingClientRect();
+  const r = videoRect();
   drag = {x:e.clientX-r.left, y:e.clientY-r.top};
-  selBox.style.display='block'; video.setPointerCapture(e.pointerId);
+  video.setPointerCapture(e.pointerId);
 });
 video.addEventListener('pointermove', e => {
   if (!drag) return;
-  const r = video.getBoundingClientRect();
+  const r = videoRect();
   const x2 = e.clientX-r.left, y2 = e.clientY-r.top;
-  const x = Math.min(drag.x,x2), y = Math.min(drag.y,y2);
-  Object.assign(selBox.style,{left:x+'px',top:y+'px',width:Math.abs(x2-drag.x)+'px',height:Math.abs(y2-drag.y)+'px'});
+  box = {x:Math.min(drag.x,x2), y:Math.min(drag.y,y2),
+         w:Math.max(24,Math.abs(x2-drag.x)), h:Math.max(24,Math.abs(y2-drag.y))};
+  applyBox();
 });
-video.addEventListener('pointerup', e => {
-  if (!drag) return;
-  const r = video.getBoundingClientRect();
-  const x2 = e.clientX-r.left, y2 = e.clientY-r.top;
-  const x = Math.min(drag.x,x2), y = Math.min(drag.y,y2);
-  const w = Math.abs(x2-drag.x), h = Math.abs(y2-drag.y);
-  drag = null;
-  if (w < 20 || h < 20) { selBox.style.display='none'; S.region=null; return; }
-  const sx = video.videoWidth / r.width, sy = video.videoHeight / r.height;
-  S.region = {x:x*sx, y:y*sy, w:w*sx, h:h*sy};
-  drawOverlay(x,y,w,h);
-});
+video.addEventListener('pointerup', () => { drag = null; });
 
 function drawOverlay(x,y,w,h){
   const r = video.getBoundingClientRect();
@@ -209,7 +294,7 @@ function drawOverlay(x,y,w,h){
 /* ---------------- 자동 판독 ---------------- */
 document.getElementById('btnScan').onclick = function(){
   if (S.timer) { clearInterval(S.timer); S.timer=null; this.textContent='자동 판독 시작'; return; }
-  if (!S.region) { alert('먼저 영상 위에서 로드맵 영역을 드래그해 지정하세요.'); return; }
+  if (!S.region) { alert('먼저 [영역 상자 만들기]로 상자를 띄우고 로드맵에 맞춰 주세요.'); return; }
   this.textContent='자동 판독 중지';
   S.timer = setInterval(scanFrame, Math.max(300, +document.getElementById('period').value));
 };
@@ -475,11 +560,8 @@ function drawDerived(id, arr){
   }
 }
 
-['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
-  if (S.region){ const r=video.getBoundingClientRect();
-    const sx=r.width/video.videoWidth, sy=r.height/video.videoHeight;
-    drawOverlay(S.region.x*sx,S.region.y*sy,S.region.w*sx,S.region.h*sy); }
-}));
+['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('input', applyBox));
+window.addEventListener('resize', applyBox);
 
 render();
 </script>
