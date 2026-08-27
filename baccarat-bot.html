@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>바카라 화면 분석 봇</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0e1220;color:#e8ecf7;font-family:'Segoe UI','Malgun Gothic',sans-serif;padding:18px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{font-size:13px;opacity:.65;margin-bottom:14px}
+  .warn{background:rgba(255,180,60,.1);border:1px solid rgba(255,180,60,.35);color:#ffce8a;
+        font-size:12.5px;line-height:1.6;padding:12px 14px;border-radius:10px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:1.25fr .95fr;gap:16px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .panel{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;margin-bottom:14px}
+  .panel h2{font-size:14px;letter-spacing:.5px;opacity:.85;margin-bottom:10px;text-transform:uppercase}
+  button{background:#2b6cf6;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;margin:0 6px 6px 0}
+  button:hover{background:#3b7bff}
+  button.ghost{background:rgba(255,255,255,.1)}
+  button.ghost:hover{background:rgba(255,255,255,.18)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.b{background:#d33a45}button.p{background:#2f6fd0}button.t{background:#1f9d63}
+  label{font-size:12px;opacity:.75;margin-right:4px}
+  input[type=number]{width:60px;background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.2);
+        border-radius:6px;padding:4px 6px;font-size:12px;margin-right:10px}
+  #stage{position:relative;display:inline-block;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
+  #video{display:block;max-width:100%;max-height:340px}
+  #sel{position:absolute;border:2px dashed #45e08a;background:rgba(69,224,138,.12);pointer-events:none;display:none}
+  #gridOverlay{position:absolute;left:0;top:0;pointer-events:none}
+  .hint{font-size:12px;opacity:.6;margin-top:8px;line-height:1.6}
+  .rec{text-align:center;padding:14px 10px;border-radius:10px;background:rgba(0,0,0,.3)}
+  .rec .pick{font-size:38px;font-weight:700;letter-spacing:2px}
+  .rec .why{font-size:12.5px;opacity:.8;margin-top:8px;line-height:1.6}
+  .conf{height:8px;background:rgba(255,255,255,.12);border-radius:4px;margin-top:10px;overflow:hidden}
+  .conf i{display:block;height:100%;background:#45e08a}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+  th{opacity:.6;font-weight:500}
+  .roads{overflow-x:auto}
+  .road{display:flex;gap:2px;margin-bottom:10px}
+  .rcol{display:flex;flex-direction:column;gap:2px}
+  .cell{width:16px;height:16px;border-radius:50%;font-size:9px;line-height:16px;text-align:center;color:#fff}
+  .cell.B{background:#d33a45}.cell.P{background:#2f6fd0}.cell.T{background:#1f9d63}
+  .cell.e{background:rgba(255,255,255,.05)}
+  .sq{border-radius:3px}
+  .roadlbl{font-size:11px;opacity:.6;margin-bottom:4px}
+  .seq{font-family:monospace;font-size:12px;line-height:1.9;word-break:break-all;opacity:.85}
+  a.back{color:#8fb4ff;font-size:12px;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">&larr; 홈</a>
+  <h1>🎴 바카라 화면 분석 · 패턴 봇</h1>
+  <div class="sub">화면 공유 → 로드맵 영역 지정 → 자동 판독 → 패턴 분석 & 베팅 제안</div>
+
+  <div class="warn">
+    <b>먼저 읽어주세요.</b> 바카라의 각 판은 독립 시행입니다. 과거 패턴은 다음 결과의 확률을 바꾸지 않으며,
+    어떤 패턴 분석도 하우스 엣지(뱅커 1.06% / 플레이어 1.24% / 타이 14.4%)를 이길 수 없습니다.
+    이 도구는 <b>로드맵을 자동으로 읽고 통계를 보여주는 보조 도구</b>이며, 추천은 "관측된 패턴을 따라가면 이 쪽"이라는
+    뜻일 뿐 <b>예측이 아닙니다</b>. 장기적으로 기대값은 항상 마이너스입니다. 실제 사이트에서의 화면 자동 판독은
+    해당 사이트 이용약관 위반일 수 있으니 본인 책임 하에 사용하세요.
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>1. 화면 공유 & 영역 지정</h2>
+        <button id="btnShare">화면 공유 시작</button>
+        <button id="btnStop" class="ghost" disabled>중지</button>
+        <button id="btnScan" class="ghost" disabled>자동 판독 시작</button>
+        <div style="margin:8px 0">
+          <label>행</label><input type="number" id="rows" value="6" min="2" max="12">
+          <label>열</label><input type="number" id="cols" value="20" min="4" max="40">
+          <label>주기(ms)</label><input type="number" id="period" value="1200" min="300" step="100" style="width:74px">
+        </div>
+        <div id="stage">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="gridOverlay"></canvas>
+          <div id="sel"></div>
+        </div>
+        <div class="hint">
+          공유 후 영상 위에서 <b>빅로드(큰 눈길) 격자 영역을 드래그</b>해 지정하세요.
+          행/열 수를 화면의 실제 격자와 맞추면 판독 정확도가 올라갑니다.
+          색 판별: 빨강=뱅커, 파랑=플레이어, 초록=타이.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>2. 수동 입력 / 보정</h2>
+        <button class="b" onclick="manual('B')">뱅커 B</button>
+        <button class="p" onclick="manual('P')">플레이어 P</button>
+        <button class="t" onclick="manual('T')">타이 T</button>
+        <button class="ghost" onclick="undo()">되돌리기</button>
+        <button class="ghost" onclick="resetAll()">전체 초기화</button>
+        <div class="seq" id="seq" style="margin-top:10px">(기록 없음)</div>
+      </div>
+
+      <div class="panel roads">
+        <h2>3. 로드맵</h2>
+        <div class="roadlbl">빅로드 (Big Road)</div><div class="road" id="bigRoad"></div>
+        <div class="roadlbl">큰눈길 (Big Eye Boy)</div><div class="road" id="beb"></div>
+        <div class="roadlbl">작은길 (Small Road)</div><div class="road" id="sr"></div>
+        <div class="roadlbl">바퀴벌레길 (Cockroach Pig)</div><div class="road" id="cp"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>4. 베팅 제안</h2>
+        <div class="rec">
+          <div class="pick" id="pick">-</div>
+          <div class="conf"><i id="confBar" style="width:0%"></i></div>
+          <div class="why" id="why">기록이 쌓이면 분석을 시작합니다.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>5. 패턴 통계</h2>
+        <table id="stats"><tbody></tbody></table>
+      </div>
+
+      <div class="panel">
+        <h2>6. 성적 추적 (플랫 베팅 기준)</h2>
+        <table id="perf"><tbody></tbody></table>
+        <div class="hint">추천이 나온 뒤 실제 결과를 입력하면 적중률과 누적 손익(뱅커 5% 커미션 반영)을 계산합니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- 상태 ---------------- */
+const S = {
+  history: [],          // 'B' | 'P' | 'T'
+  stream: null, timer: null,
+  region: null,         // {x,y,w,h} in video pixel coords
+  lastRead: null, stableCount: 0,
+  pendingRec: null,     // 직전 추천 (성적 추적용)
+  perf: {n:0, hit:0, pnl:0}
+};
+
+/* ---------------- 화면 공유 ---------------- */
+const video = document.getElementById('video');
+const overlay = document.getElementById('gridOverlay');
+const selBox = document.getElementById('sel');
+const work = document.createElement('canvas');
+
+document.getElementById('btnShare').onclick = async () => {
+  try {
+    S.stream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5}, audio:false});
+    video.srcObject = S.stream;
+    S.stream.getVideoTracks()[0].addEventListener('ended', stopShare);
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('btnScan').disabled = false;
+  } catch(e) { alert('화면 공유를 시작하지 못했습니다: ' + e.message); }
+};
+document.getElementById('btnStop').onclick = stopShare;
+function stopShare(){
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  if (S.stream) S.stream.getTracks().forEach(t=>t.stop());
+  S.stream = null; video.srcObject = null;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnScan').disabled = true;
+  document.getElementById('btnScan').textContent = '자동 판독 시작';
+}
+
+/* 영역 드래그 선택 */
+let drag = null;
+video.addEventListener('pointerdown', e => {
+  const r = video.getBoundingClientRect();
+  drag = {x:e.clientX-r.left, y:e.clientY-r.top};
+  selBox.style.display='block'; video.setPointerCapture(e.pointerId);
+});
+video.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = video.getBoundingClientRect();
+  const x2 = e.clientX-r.left, y2 = e.clientY-r.top;
+  const x = Math.min(drag.x,x2), y = Math.min(drag.y,y2);
+  Object.assign(selBox.style,{left:x+'px',top:y+'px',width:Math.abs(x2-drag.x)+'px',height:Math.abs(y2-drag.y)+'px'});
+});
+video.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const r = video.getBoundingClientRect();
+  const x2 = e.clientX-r.left, y2 = e.clientY-r.top;
+  const x = Math.min(drag.x,x2), y = Math.min(drag.y,y2);
+  const w = Math.abs(x2-drag.x), h = Math.abs(y2-drag.y);
+  drag = null;
+  if (w < 20 || h < 20) { selBox.style.display='none'; S.region=null; return; }
+  const sx = video.videoWidth / r.width, sy = video.videoHeight / r.height;
+  S.region = {x:x*sx, y:y*sy, w:w*sx, h:h*sy};
+  drawOverlay(x,y,w,h);
+});
+
+function drawOverlay(x,y,w,h){
+  const r = video.getBoundingClientRect();
+  overlay.width = r.width; overlay.height = r.height;
+  overlay.style.width = r.width+'px'; overlay.style.height = r.height+'px';
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0,0,overlay.width,overlay.height);
+  const rows = +document.getElementById('rows').value, cols = +document.getElementById('cols').value;
+  ctx.strokeStyle='rgba(69,224,138,.35)'; ctx.lineWidth=1;
+  for(let c=0;c<=cols;c++){ ctx.beginPath(); ctx.moveTo(x+w*c/cols,y); ctx.lineTo(x+w*c/cols,y+h); ctx.stroke(); }
+  for(let rr=0;rr<=rows;rr++){ ctx.beginPath(); ctx.moveTo(x,y+h*rr/rows); ctx.lineTo(x+w,y+h*rr/rows); ctx.stroke(); }
+}
+
+/* ---------------- 자동 판독 ---------------- */
+document.getElementById('btnScan').onclick = function(){
+  if (S.timer) { clearInterval(S.timer); S.timer=null; this.textContent='자동 판독 시작'; return; }
+  if (!S.region) { alert('먼저 영상 위에서 로드맵 영역을 드래그해 지정하세요.'); return; }
+  this.textContent='자동 판독 중지';
+  S.timer = setInterval(scanFrame, Math.max(300, +document.getElementById('period').value));
+};
+
+function scanFrame(){
+  if (!S.region || !video.videoWidth) return;
+  const rows = +document.getElementById('rows').value, cols = +document.getElementById('cols').value;
+  work.width = S.region.w; work.height = S.region.h;
+  const ctx = work.getContext('2d', {willReadFrequently:true});
+  ctx.drawImage(video, S.region.x, S.region.y, S.region.w, S.region.h, 0, 0, work.width, work.height);
+  const img = ctx.getImageData(0,0,work.width,work.height).data;
+  const cw = work.width/cols, ch = work.height/rows;
+
+  const grid = [];  // grid[col][row]
+  for (let c=0;c<cols;c++){
+    grid[c] = [];
+    for (let r=0;r<rows;r++){
+      grid[c][r] = classifyCell(img, work.width, work.height,
+        Math.round(c*cw), Math.round(r*ch), Math.round(cw), Math.round(ch));
+    }
+  }
+  const seq = gridToSequence(grid, rows, cols);
+  const key = seq.join('');
+  // 같은 판독이 2회 연속 나올 때만 확정 (프레임 노이즈 방지)
+  if (key === S.lastRead) { S.stableCount++; } else { S.lastRead = key; S.stableCount = 1; }
+  if (S.stableCount === 2 && seq.length && key !== S.history.join('')) {
+    if (seq.length >= S.history.length) { S.history = seq; render(); }
+  }
+}
+
+// 셀 중앙부를 샘플링해 색 분류
+function classifyCell(img, W, H, x, y, w, h){
+  const px = Math.round(x + w*0.22), py = Math.round(y + h*0.22);
+  const pw = Math.max(1, Math.round(w*0.56)), ph = Math.max(1, Math.round(h*0.56));
+  let nB=0,nP=0,nT=0,tot=0;
+  for (let j=py;j<py+ph;j+=1){
+    if (j<0||j>=H) continue;
+    for (let i=px;i<px+pw;i+=1){
+      if (i<0||i>=W) continue;
+      const o = (j*W+i)*4, r=img[o], g=img[o+1], b=img[o+2];
+      const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+      tot++;
+      if (mx < 55 || mx-mn < 42) continue;          // 어둡거나 무채색 → 빈 칸/격자선
+      if (r===mx && r-g>35 && r-b>35) nB++;
+      else if (b===mx && b-r>30 && b-g>15) nP++;
+      else if (g===mx && g-r>28 && g-b>18) nT++;
+    }
+  }
+  if (!tot) return null;
+  const th = tot*0.10;
+  const best = Math.max(nB,nP,nT);
+  if (best < th) return null;
+  return best===nT ? 'T' : (best===nB ? 'B' : 'P');
+}
+
+// 빅로드 격자 → 결과 시퀀스 (열 우선, 위→아래)
+function gridToSequence(grid, rows, cols){
+  const out = [];
+  for (let c=0;c<cols;c++){
+    let any=false;
+    for (let r=0;r<rows;r++){
+      const v = grid[c][r];
+      if (v){ out.push(v); any=true; }
+      else if (any) break;   // 열 중간 공백 = 열 끝
+    }
+    if (!any) break;         // 빈 열 = 로드 끝
+  }
+  return out;
+}
+
+/* ---------------- 수동 입력 ---------------- */
+function manual(v){ addResult(v); }
+function undo(){ S.history.pop(); S.lastRead=null; render(); }
+function resetAll(){ S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0}; render(); }
+
+function addResult(v){
+  // 직전 추천 성적 반영
+  if (S.pendingRec && S.pendingRec !== 'SKIP'){
+    if (v !== 'T'){
+      S.perf.n++;
+      if (v === S.pendingRec){ S.perf.hit++; S.perf.pnl += (v==='B' ? 0.95 : 1); }
+      else S.perf.pnl -= 1;
+    }
+  }
+  S.history.push(v);
+  render();
+}
+
+/* ---------------- 로드맵 계산 ---------------- */
+function bigRoadColumns(hist){
+  // 타이는 별도 열을 만들지 않음 (직전 결과에 부착)
+  const cols = []; let cur = null;
+  for (const v of hist){
+    if (v === 'T'){ if (cur) cur.ties[cur.items.length-1] = (cur.ties[cur.items.length-1]||0)+1; continue; }
+    if (!cur || cur.side !== v){ cur = {side:v, items:[], ties:{}}; cols.push(cur); }
+    cur.items.push(v);
+  }
+  return cols;
+}
+
+// 파생 로드 (k=1 큰눈길, 2 작은길, 3 바퀴벌레길)
+function derivedRoad(cols, k){
+  const out = [];
+  for (let c=0;c<cols.length;c++){
+    for (let r=0;r<cols[c].items.length;r++){
+      if (r === 0){
+        const a = cols[c-k-1], b = cols[c-k-2];
+        if (!a || !b) continue;
+        out.push(a.items.length === b.items.length ? 'R' : 'Bl');
+      } else {
+        const a = cols[c-k];
+        if (!a) continue;
+        out.push(a.items.length === r-1 ? 'Bl' : 'R');
+      }
+    }
+  }
+  return out;
+}
+
+/* ---------------- 패턴 분석 ---------------- */
+function analyze(hist){
+  const nz = hist.filter(v=>v!=='T');
+  const cols = bigRoadColumns(hist);
+  const nB = nz.filter(v=>v==='B').length, nP = nz.length-nB;
+  const nT = hist.length - nz.length;
+
+  // 현재 줄(streak)
+  const streak = cols.length ? cols[cols.length-1].items.length : 0;
+  const streakSide = cols.length ? cols[cols.length-1].side : null;
+
+  // 열 길이 분포로 "줄 유지 확률" 근사
+  const lens = cols.slice(0,-1).map(c=>c.items.length);
+  const cont = lens.filter(l=>l>streak).length, ended = lens.filter(l=>l===streak).length;
+  const contRate = (cont+ended) ? cont/(cont+ended) : null;
+
+  // 핑퐁(교대) 비율
+  let alt=0;
+  for (let i=1;i<nz.length;i++) if (nz[i]!==nz[i-1]) alt++;
+  const altRate = nz.length>1 ? alt/(nz.length-1) : 0;
+
+  // 최근 4구간 마르코프 (n-gram, n=3)
+  const n = 3; const map = {};
+  for (let i=0;i+n<nz.length;i++){
+    const k = nz.slice(i,i+n).join('');
+    (map[k] = map[k] || {B:0,P:0})[nz[i+n]]++;
+  }
+  const lastKey = nz.slice(-n).join('');
+  const ng = nz.length>n ? map[lastKey] : null;
+
+  // 파생로드 일치도 (세 길이 모두 같은 방향이면 강한 신호로 취급)
+  const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
+  const dLast = [beb,sr,cp].map(a=>a[a.length-1]).filter(Boolean);
+  const dRed = dLast.filter(v=>v==='R').length;
+
+  /* 점수 합산: +는 뱅커, -는 플레이어 방향 */
+  let score = 0; const reasons = [];
+  score += 0.06; reasons.push('뱅커 하우스 엣지 우위(-1.06% vs -1.24%)');
+
+  if (streak >= 3 && streakSide){
+    const w = Math.min(0.5, 0.12*(streak-2));
+    score += (streakSide==='B' ? w : -w);
+    reasons.push(`현재 ${streakSide==='B'?'뱅커':'플레이어'} ${streak}연승 진행 중` +
+      (contRate!=null ? ` (과거 같은 길이에서 연장 ${(contRate*100).toFixed(0)}%)` : ''));
+  }
+  if (altRate > 0.62 && streak === 1 && streakSide){
+    const opp = streakSide==='B' ? -0.3 : 0.3;
+    score += opp;
+    reasons.push(`핑퐁 성향 강함(교대율 ${(altRate*100).toFixed(0)}%) → 반대편`);
+  }
+  if (ng && (ng.B+ng.P) >= 4){
+    const tot = ng.B+ng.P, bias = (ng.B-ng.P)/tot;
+    score += bias*0.35;
+    reasons.push(`최근 3구간 "${lastKey}" 이후 표본 ${tot}회 → B ${ng.B} / P ${ng.P}`);
+  }
+  if (dLast.length === 3){
+    const dir = dRed>=2 ? 1 : -1;   // 빨강 우세 = 현재 흐름 유지
+    const side = streakSide==='B' ? 1 : -1;
+    score += dir*side*0.22;
+    reasons.push(`파생로드 빨강 ${dRed}/3 → 흐름 ${dRed>=2?'유지':'전환'} 신호`);
+  }
+
+  const conf = Math.min(1, Math.abs(score)/0.8);
+  let pick;
+  if (hist.length < 8) pick = 'SKIP';
+  else if (Math.abs(score) < 0.10) pick = 'B';   // 신호 없음 → 기본값은 엣지가 낮은 뱅커
+  else pick = score > 0 ? 'B' : 'P';
+
+  return {pick, conf, reasons, nB, nP, nT, streak, streakSide, altRate, contRate, cols, beb, sr, cp, score};
+}
+
+/* ---------------- 렌더 ---------------- */
+function render(){
+  const hist = S.history;
+  document.getElementById('seq').textContent = hist.length
+    ? hist.map((v,i)=>((i%10===0&&i)?' | ':'')+v).join('') + `   (총 ${hist.length}판)`
+    : '(기록 없음)';
+
+  const a = analyze(hist);
+  S.pendingRec = hist.length >= 8 ? a.pick : null;
+
+  const pickEl = document.getElementById('pick');
+  const names = {B:'뱅커 (BANKER)', P:'플레이어 (PLAYER)', SKIP:'관망'};
+  pickEl.textContent = names[a.pick];
+  pickEl.style.color = a.pick==='B' ? '#ff7b85' : a.pick==='P' ? '#79aaff' : '#aab';
+  document.getElementById('confBar').style.width = (a.conf*100).toFixed(0)+'%';
+  document.getElementById('why').innerHTML = hist.length < 8
+    ? '표본이 8판 미만입니다. 관망을 권장합니다.'
+    : `신뢰도 ${(a.conf*100).toFixed(0)}% · 점수 ${a.score.toFixed(2)}<br>· ` + a.reasons.join('<br>· ')
+      + '<br><span style="opacity:.6">※ 이 신뢰도는 패턴 일관성 지표일 뿐, 적중 확률이 아닙니다.</span>';
+
+  const tot = a.nB + a.nP;
+  document.querySelector('#stats tbody').innerHTML = `
+    <tr><th>총 판수</th><td>${hist.length} (타이 ${a.nT} 제외 ${tot})</td></tr>
+    <tr><th>뱅커 / 플레이어</th><td>${a.nB} (${tot?(a.nB/tot*100).toFixed(1):0}%) / ${a.nP} (${tot?(a.nP/tot*100).toFixed(1):0}%)</td></tr>
+    <tr><th>현재 줄</th><td>${a.streakSide?`${a.streakSide==='B'?'뱅커':'플레이어'} ${a.streak}연속`:'-'}</td></tr>
+    <tr><th>교대(핑퐁)율</th><td>${(a.altRate*100).toFixed(1)}%</td></tr>
+    <tr><th>줄 연장률</th><td>${a.contRate!=null?(a.contRate*100).toFixed(0)+'%':'표본 부족'}</td></tr>
+    <tr><th>이론 기대값</th><td>뱅커 -1.06% · 플레이어 -1.24% · 타이 -14.4%</td></tr>`;
+
+  const p = S.perf;
+  document.querySelector('#perf tbody').innerHTML = `
+    <tr><th>평가된 추천</th><td>${p.n}회</td></tr>
+    <tr><th>적중</th><td>${p.hit}회 (${p.n?(p.hit/p.n*100).toFixed(1):0}%)</td></tr>
+    <tr><th>누적 손익</th><td style="color:${p.pnl>=0?'#45e08a':'#ff7b85'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(2)} 유닛</td></tr>`;
+
+  drawRoad('bigRoad', a.cols);
+  drawDerived('beb', a.beb); drawDerived('sr', a.sr); drawDerived('cp', a.cp);
+}
+
+function drawRoad(id, cols){
+  const el = document.getElementById(id); el.innerHTML='';
+  const view = cols.slice(-26);
+  for (const c of view){
+    const d = document.createElement('div'); d.className='rcol';
+    for (let i=0;i<Math.min(c.items.length,6);i++){
+      const s = document.createElement('div');
+      s.className = 'cell ' + c.side;
+      s.textContent = c.ties[i] ? c.ties[i] : '';
+      d.appendChild(s);
+    }
+    if (c.items.length > 6){
+      const s = document.createElement('div'); s.className='cell '+c.side; s.textContent = '+'+(c.items.length-6);
+      d.appendChild(s);
+    }
+    el.appendChild(d);
+  }
+  if (!view.length) el.innerHTML = '<span style="font-size:12px;opacity:.5">-</span>';
+}
+
+function drawDerived(id, arr){
+  const el = document.getElementById(id); el.innerHTML='';
+  const view = arr.slice(-60);
+  if (!view.length){ el.innerHTML='<span style="font-size:12px;opacity:.5">표본 부족</span>'; return; }
+  // 6행 세로 배치
+  for (let i=0;i<view.length;i+=6){
+    const d = document.createElement('div'); d.className='rcol';
+    for (const v of view.slice(i,i+6)){
+      const s = document.createElement('div');
+      s.className = 'cell sq ' + (v==='R'?'B':'P');
+      d.appendChild(s);
+    }
+    el.appendChild(d);
+  }
+}
+
+['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+  if (S.region){ const r=video.getBoundingClientRect();
+    const sx=r.width/video.videoWidth, sy=r.height/video.videoHeight;
+    drawOverlay(S.region.x*sx,S.region.y*sy,S.region.w*sx,S.region.h*sy); }
+}));
+
+render();
+</script>
+</body>
+</html>
