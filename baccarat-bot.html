@@ -152,14 +152,41 @@
       </div>
 
       <div class="panel">
-        <h2>6. 패턴 통계</h2>
+        <h2>6. 패턴별 실적 (백테스트)</h2>
+        <table id="ptable"><tbody></tbody></table>
+        <div class="hint">이 슈의 기록을 처음부터 되돌려(백테스트) 각 패턴이 실제로 몇 번 맞았는지 계산합니다.
+          Wilson 95% 신뢰구간이 50%를 포함하면 <b>우연과 구분되지 않는다</b>는 뜻이며, 그런 패턴은 가중치가 자동으로 낮아집니다.</div>
+      </div>
+
+      <div class="panel">
+        <h2>7. 무작위성 검정</h2>
+        <table id="rand"><tbody></tbody></table>
+        <div class="hint">런 검정 · 카이제곱 · 엔트로피로 "이 슈가 정말 무작위와 다른가"를 통계적으로 확인합니다.</div>
+      </div>
+
+      <div class="panel">
+        <h2>8. 슈 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>7. 성적 추적 (플랫 베팅 기준)</h2>
-        <table id="perf"><tbody></tbody></table>
-        <div class="hint">추천이 나온 뒤 실제 결과를 입력하면 적중률과 누적 손익(뱅커 5% 커미션 반영)을 계산합니다.</div>
+        <h2>9. 자금 관리 & 성적</h2>
+        <div style="margin-bottom:10px">
+          <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px">
+          <label>1유닛</label><input type="number" id="unit" value="10" min="1" style="width:60px">
+          <label>켈리 비율</label><input type="number" id="kelly" value="25" min="0" max="100" style="width:52px"><span style="font-size:11px;opacity:.6">%</span>
+        </div>
+        <canvas id="curve" height="70" style="width:100%;background:rgba(0,0,0,.25);border-radius:8px"></canvas>
+        <table id="perf" style="margin-top:8px"><tbody></tbody></table>
+      </div>
+
+      <div class="panel">
+        <h2>10. 세션</h2>
+        <button class="ghost" onclick="saveSession()">저장</button>
+        <button class="ghost" onclick="loadSession()">불러오기</button>
+        <button class="ghost" onclick="exportCSV()">CSV 내보내기</button>
+        <button class="ghost" onclick="importPrompt()">기록 직접 입력</button>
+        <div class="hint" id="sessMsg">기록은 이 브라우저에만 저장됩니다.</div>
       </div>
     </div>
   </div>
@@ -426,14 +453,71 @@ function derivedRoad(cols, k){
   return out;
 }
 
-/* ---------------- 패턴 분석 ---------------- */
-const OPP = s => s === 'B' ? 'P' : 'B';
-
-/* 열 길이 주기 패턴에서 "현재 열의 예상 길이"를 뽑아
-   현재 길이와 비교해 유지/전환을 판정하는 공통 헬퍼 */
-function fromExpected(expected, cur, side){
-  return cur >= expected ? OPP(side) : side;
+/* ---------------- 통계 유틸 ---------------- */
+// 표준정규 누적분포 (Abramowitz-Stegun 근사)
+function normCdf(z){
+  const t = 1/(1+0.2316419*Math.abs(z));
+  const d = 0.3989422804014327*Math.exp(-z*z/2);
+  const p = d*t*(0.319381530 + t*(-0.356563782 + t*(1.781477937 + t*(-1.821255978 + t*1.330274429))));
+  return z > 0 ? 1-p : p;
 }
+const twoSidedP = z => 2*(1-normCdf(Math.abs(z)));
+
+// Wilson 점수 신뢰구간 (95%)
+function wilson(h, n){
+  if (!n) return [0,1];
+  const z = 1.96, ph = h/n, d = 1 + z*z/n;
+  const c = ph + z*z/(2*n), m = z*Math.sqrt(ph*(1-ph)/n + z*z/(4*n*n));
+  return [(c-m)/d, (c+m)/d];
+}
+// 이항검정 p값 (정규근사, p0=0.5)
+const binomP = (h,n) => n ? twoSidedP((h - n/2) / Math.sqrt(n/4)) : 1;
+
+// Wald-Wolfowitz 런 검정: Z<0 = 뭉침(줄), Z>0 = 과도한 교대(핑퐁)
+function runsTest(seq){
+  const n1 = seq.filter(v=>v==='B').length, n2 = seq.length - n1, n = seq.length;
+  if (n1 < 2 || n2 < 2) return null;
+  let runs = 1;
+  for (let i=1;i<n;i++) if (seq[i] !== seq[i-1]) runs++;
+  const mu = 2*n1*n2/n + 1;
+  const sd = Math.sqrt(2*n1*n2*(2*n1*n2-n) / (n*n*(n-1)));
+  if (!sd) return null;
+  return {runs, expected:mu, z:(runs-mu)/sd, p:twoSidedP((runs-mu)/sd)};
+}
+// 카이제곱 적합도 (뱅커 50.68% / 플레이어 49.32%, 타이 제외 기준)
+function chiSquare(nB, nP){
+  const n = nB+nP; if (n < 10) return null;
+  const eB = n*0.5068, eP = n*0.4932;
+  const x2 = (nB-eB)**2/eB + (nP-eP)**2/eP;
+  return {x2, p: twoSidedP(Math.sqrt(x2))};
+}
+// 1차 조건부 엔트로피 (1.0 = 완전 무작위)
+function entropy(seq){
+  if (seq.length < 4) return null;
+  const c = {BB:0,BP:0,PB:0,PP:0};
+  for (let i=1;i<seq.length;i++) c[seq[i-1]+seq[i]]++;
+  let H = 0;
+  for (const pre of ['B','P']){
+    const tot = c[pre+'B'] + c[pre+'P']; if (!tot) continue;
+    for (const nx of ['B','P']){
+      const q = c[pre+nx]/tot; if (q > 0) H -= (tot/(seq.length-1)) * q * Math.log2(q);
+    }
+  }
+  return H;
+}
+// 지연 자기상관 (±1 부호화)
+function autocorr(seq, lag){
+  if (seq.length < lag + 8) return null;
+  const x = seq.map(v => v === 'B' ? 1 : -1);
+  const m = x.reduce((a,b)=>a+b,0)/x.length;
+  let num = 0, den = 0;
+  for (let i=0;i<x.length;i++){ den += (x[i]-m)**2; if (i>=lag) num += (x[i]-m)*(x[i-lag]-m); }
+  return den ? num/den : null;
+}
+
+/* ---------------- 패턴 감지 ---------------- */
+const OPP = s => s === 'B' ? 'P' : 'B';
+const fromExpected = (expected, cur, side) => cur >= expected ? OPP(side) : side;
 
 function detectPatterns(hist){
   const nz = hist.filter(v => v !== 'T');
@@ -442,162 +526,266 @@ function detectPatterns(hist){
   if (!cols.length || nz.length < 6) return out;
 
   const L    = cols.map(c => c.items.length);
-  const done = L.slice(0, -1);          // 완성된 열
-  const cur  = L[L.length - 1];         // 진행 중인 열 길이
+  const done = L.slice(0, -1);
+  const cur  = L[L.length - 1];
   const side = cols[cols.length - 1].side;
-  const add = (name, s, w, desc) => out.push({name, side:s, w, desc});
-  const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const nB = nz.filter(v => v === 'B').length, nP = nz.length - nB;
+  const add = (key, name, s, w, desc) => out.push({key, name, side:s, w, desc});
+  const eq = (a,b) => a.length === b.length && a.every((v,i) => v === b[i]);
   const tail = n => done.slice(-n);
+  const pct = v => (v*100).toFixed(0) + '%';
 
-  /* 1. 용 (Dragon) — 한 쪽이 4연속 이상 */
-  if (cur >= 4)
-    add(`용(Dragon) ${cur}연`, side, Math.min(0.45, 0.10 * (cur - 2)),
+  /* --- 줄(열) 형태 패턴 --- */
+  if (cur >= 6)
+    add('tail', `드래곤 꼬리 ${cur}연`, side, 0.42,
+        `${side==='B'?'뱅커':'플레이어'} ${cur}연속 — 6칸을 넘긴 초장기 줄`);
+  else if (cur >= 4)
+    add('dragon', `용(Dragon) ${cur}연`, side, Math.min(0.40, 0.10*(cur-2)),
         `${side==='B'?'뱅커':'플레이어'} ${cur}연속. 긴 줄은 끊길 때까지 따라가는 것이 정석`);
   else if (cur === 3)
-    add('삼연(3연)', side, 0.14, '3연속 진행 중 — 용으로 이어질지 관찰 구간');
+    add('three', '삼연(3연)', side, 0.14, '3연속 진행 중 — 용으로 이어질지 관찰 구간');
 
-  /* 2. 핑퐁 (Ping Pong) — 한 칸짜리 열이 반복 */
-  if (tail(4).length === 4 && tail(4).every(v => v === 1) && cur === 1)
-    add('핑퐁(Ping Pong)', OPP(side), 0.32, '1칸 열이 4회 이상 반복 — 교대 흐름');
-  else if (tail(5).filter(v => v === 1).length >= 4 && cur === 1)
-    add('촙(Chop) 성향', OPP(side), 0.22, '최근 5열 중 4열이 1칸 — 잦은 교대 구간');
+  if (tail(4).length === 4 && tail(4).every(v=>v===1) && cur === 1)
+    add('pingpong', '핑퐁(Ping Pong)', OPP(side), 0.32, '1칸 열이 4회 이상 반복 — 교대 흐름');
+  else if (tail(5).filter(v=>v===1).length >= 4 && cur === 1)
+    add('chop', '촙(Chop) 성향', OPP(side), 0.22, '최근 5열 중 4열이 1칸 — 잦은 교대 구간');
 
-  /* 3. 원투 / 투원 — 1-2-1-2 또는 2-1-2-1 주기 */
   if (eq(tail(4), [1,2,1,2]) || eq(tail(4), [2,1,2,1])) {
     const cyc = tail(4);
-    const expected = cyc[0];            // 4주기이므로 다음 열은 4칸 전과 동일
-    add(cyc[0] === 1 ? '원투(1-2)' : '투원(2-1)', fromExpected(expected, cur, side), 0.28,
-        `열 길이가 ${cyc.join('-')} 주기 — 이번 열 예상 ${expected}칸 (현재 ${cur}칸)`);
+    add(cyc[0]===1?'onetwo':'twoone', cyc[0]===1?'원투(1-2)':'투원(2-1)',
+        fromExpected(cyc[0], cur, side), 0.28,
+        `열 길이 ${cyc.join('-')} 주기 — 이번 열 예상 ${cyc[0]}칸 (현재 ${cur}칸)`);
   }
+  else if (eq(tail(4), [1,3,1,3]) || eq(tail(4), [3,1,3,1]))
+    add('onethree', tail(4)[0]===1?'원쓰리(1-3)':'쓰리원(3-1)',
+        fromExpected(tail(4)[0], cur, side), 0.26, `열 길이 ${tail(4).join('-')} 주기`);
+  else if (tail(3).length === 3 && tail(3).every(v=>v===2))
+    add('double', '쌍줄(2-2-2)', fromExpected(2, cur, side), 0.26, '2칸 열이 3회 연속 — 이번 열도 2칸 예상');
+  else if (tail(2).length === 2 && tail(2).every(v=>v===3))
+    add('triple', '삼삼(3-3)', fromExpected(3, cur, side), 0.22, '3칸 열이 연속 — 이번 열도 3칸 예상');
 
-  /* 4. 쌍줄 / 더블 (2-2-2) */
-  else if (tail(3).length === 3 && tail(3).every(v => v === 2))
-    add('쌍줄(2-2-2)', fromExpected(2, cur, side), 0.26, '2칸 열이 3회 연속 — 이번 열도 2칸 예상');
-
-  /* 5. 삼삼 (3-3) */
-  else if (tail(2).length === 2 && tail(2).every(v => v === 3))
-    add('삼삼(3-3)', fromExpected(3, cur, side), 0.22, '3칸 열이 연속 — 이번 열도 3칸 예상');
-
-  /* 6. 계단 / 역계단 */
   const t3 = tail(3);
-  if (t3.length === 3 && t3[1] === t3[0] + 1 && t3[2] === t3[1] + 1)
-    add('계단(오름)', fromExpected(t3[2] + 1, cur, side), 0.20,
-        `열 길이가 ${t3.join('→')}로 증가 — 이번 열 ${t3[2]+1}칸 예상`);
-  if (t3.length === 3 && t3[1] === t3[0] - 1 && t3[2] === t3[1] - 1 && t3[2] >= 1)
-    add('계단(내림)', fromExpected(Math.max(1, t3[2] - 1), cur, side), 0.20,
-        `열 길이가 ${t3.join('→')}로 감소 — 이번 열 ${Math.max(1,t3[2]-1)}칸 예상`);
+  if (t3.length === 3 && t3[1] === t3[0]+1 && t3[2] === t3[1]+1)
+    add('stepup', '계단(오름)', fromExpected(t3[2]+1, cur, side), 0.20,
+        `열 길이 ${t3.join('→')} 증가 — 이번 열 ${t3[2]+1}칸 예상`);
+  if (t3.length === 3 && t3[1] === t3[0]-1 && t3[2] === t3[1]-1 && t3[2] >= 1)
+    add('stepdn', '계단(내림)', fromExpected(Math.max(1,t3[2]-1), cur, side), 0.20,
+        `열 길이 ${t3.join('→')} 감소 — 이번 열 ${Math.max(1,t3[2]-1)}칸 예상`);
 
-  /* 7. 짝수줄 / 홀수줄 편향 */
   const t6 = tail(6);
-  if (t6.length === 6) {
-    if (t6.every(v => v % 2 === 0))
-      add('짝수줄 편향', cur % 2 === 1 ? side : OPP(side), 0.18, '최근 6열이 모두 짝수 칸');
-    else if (t6.every(v => v % 2 === 1))
-      add('홀수줄 편향', cur % 2 === 0 ? side : OPP(side), 0.18, '최근 6열이 모두 홀수 칸');
+  if (t6.length === 6){
+    if (t6.every(v=>v%2===0)) add('even', '짝수줄 편향', cur%2===1?side:OPP(side), 0.18, '최근 6열이 모두 짝수 칸');
+    else if (t6.every(v=>v%2===1)) add('odd', '홀수줄 편향', cur%2===0?side:OPP(side), 0.18, '최근 6열이 모두 홀수 칸');
   }
-
-  /* 8. 같은 열 길이 반복 (한줄떡 등 임의 길이) */
   const t4 = tail(4);
-  if (t4.length === 4 && t4.every(v => v === t4[0]) && t4[0] >= 3)
-    add(`${t4[0]}줄 반복`, fromExpected(t4[0], cur, side), 0.24,
-        `${t4[0]}칸 열이 4회 연속 — 매우 규칙적인 구간`);
+  if (t4.length === 4 && t4.every(v=>v===t4[0]) && t4[0] >= 3)
+    add('rep', `${t4[0]}줄 반복`, fromExpected(t4[0], cur, side), 0.24, `${t4[0]}칸 열이 4회 연속 — 매우 규칙적인 구간`);
 
-  /* 9. 가변차수 반복 패턴 (order 6→2 백오프) */
-  for (let n = 6; n >= 2; n--) {
+  // 열 길이 대칭 (팰린드롬)
+  const t5 = tail(5);
+  if (t5.length === 5 && eq(t5, t5.slice().reverse()))
+    add('colsym', '열 대칭', fromExpected(t5[0], cur, side), 0.16, `최근 5열 길이 ${t5.join('-')}가 좌우 대칭`);
+
+  /* --- 시퀀스 통계 패턴 --- */
+  for (let n = 6; n >= 2; n--){
     if (nz.length < n + 4) continue;
     const key = nz.slice(-n).join('');
-    let hitB = 0, hitP = 0;
+    let hB = 0, hP = 0;
     for (let i = 0; i + n < nz.length; i++)
-      if (nz.slice(i, i + n).join('') === key) (nz[i + n] === 'B' ? hitB++ : hitP++);
-    const tot = hitB + hitP;
-    if (tot >= 3 && hitB !== hitP) {
-      const bias = (hitB - hitP) / tot;
-      add(`반복 패턴 ${n}구간`, bias > 0 ? 'B' : 'P', Math.min(0.30, Math.abs(bias) * 0.30 + tot * 0.02),
-          `"${key}" 이후 과거 ${tot}회 → 뱅커 ${hitB} / 플레이어 ${hitP}`);
+      if (nz.slice(i, i+n).join('') === key) (nz[i+n] === 'B' ? hB++ : hP++);
+    const tot = hB + hP;
+    if (tot >= 3 && hB !== hP){
+      const bias = (hB-hP)/tot;
+      add('markov', `반복 패턴 ${n}구간`, bias>0?'B':'P',
+          Math.min(0.30, Math.abs(bias)*0.30 + tot*0.02),
+          `"${key}" 이후 과거 ${tot}회 → 뱅커 ${hB} / 플레이어 ${hP}`);
       break;
     }
   }
 
-  /* 10. 줄 꺾임 통계 — 현재 길이에서 실제로 연장됐던 비율 */
-  const contN = done.filter(l => l >  cur).length;
-  const endN  = done.filter(l => l === cur).length;
-  if (contN + endN >= 4) {
-    const rate = contN / (contN + endN);
-    if (Math.abs(rate - 0.5) > 0.12)
-      add('줄 연장 통계', rate > 0.5 ? side : OPP(side), Math.min(0.25, Math.abs(rate - 0.5) * 0.6),
-          `이 슈에서 ${cur}칸 열이 더 길어진 비율 ${(rate*100).toFixed(0)}% (표본 ${contN+endN})`);
+  const contN = done.filter(l => l >  cur).length, endN = done.filter(l => l === cur).length;
+  if (contN + endN >= 4){
+    const rate = contN/(contN+endN);
+    if (Math.abs(rate-0.5) > 0.12)
+      add('contrate', '줄 연장 통계', rate>0.5?side:OPP(side), Math.min(0.25, Math.abs(rate-0.5)*0.6),
+          `이 슈에서 ${cur}칸 열이 더 길어진 비율 ${pct(rate)} (표본 ${contN+endN})`);
   }
 
-  /* 11. 슈 편향 — 한 쪽이 크게 앞선 슈 */
-  const nB = nz.filter(v => v === 'B').length, nP = nz.length - nB;
-  if (nz.length >= 20) {
-    const bias = (nB - nP) / nz.length;
+  if (nz.length >= 20){
+    const bias = (nB-nP)/nz.length;
     if (Math.abs(bias) > 0.20)
-      add('슈 편향', bias > 0 ? 'B' : 'P', Math.min(0.22, Math.abs(bias) * 0.5),
+      add('shoebias', '슈 편향', bias>0?'B':'P', Math.min(0.22, Math.abs(bias)*0.5),
           `이 슈 ${nz.length}판에서 ${bias>0?'뱅커':'플레이어'}가 ${Math.abs(nB-nP)}판 우세`);
   }
 
-  /* 12. 대칭(미러) — 최근 4판이 그 직전 4판의 역순 */
-  if (nz.length >= 8) {
-    const a = nz.slice(-4), b = nz.slice(-8, -4).slice().reverse();
-    if (eq(a, b)) add('대칭(미러)', OPP(nz[nz.length - 5]), 0.16, '최근 4판이 직전 4판의 거울상');
+  // 최근 모멘텀 (직전 10판)
+  if (nz.length >= 14){
+    const r = nz.slice(-10), rb = r.filter(v=>v==='B').length;
+    if (rb >= 7 || rb <= 3)
+      add('momentum', '단기 모멘텀', rb>=7?'B':'P', 0.18,
+          `최근 10판 뱅커 ${rb} / 플레이어 ${10-rb} — 단기 쏠림`);
   }
 
-  /* 13. 파생로드 3색 일치 */
+  // 국면 전환: 최근 20판 비율이 슈 전체와 크게 다름
+  if (nz.length >= 40){
+    const r = nz.slice(-20), rb = r.filter(v=>v==='B').length/20, all = nB/nz.length;
+    if (Math.abs(rb-all) > 0.22)
+      add('regime', '국면 전환', rb>all?'B':'P', 0.16,
+          `최근 20판 뱅커율 ${pct(rb)} vs 슈 전체 ${pct(all)} — 흐름이 바뀌는 중`);
+  }
+
+  // 자기상관 lag-2 / lag-3
+  for (const lag of [2,3]){
+    const r = autocorr(nz, lag);
+    if (r != null && Math.abs(r) > 0.25 && nz.length >= 16){
+      const ref = nz[nz.length-lag];
+      add('lag'+lag, `자기상관 lag-${lag}`, r>0 ? ref : OPP(ref), Math.min(0.22, Math.abs(r)*0.5),
+          `${lag}판 전과의 상관 ${r.toFixed(2)} — ${lag}판 전은 ${ref==='B'?'뱅커':'플레이어'}`);
+    }
+  }
+
+  // 런 검정
+  const rt = runsTest(nz);
+  if (rt && Math.abs(rt.z) > 1.96)
+    add('runs', rt.z < 0 ? '런 검정: 뭉침' : '런 검정: 과교대', rt.z < 0 ? side : OPP(side),
+        Math.min(0.24, (Math.abs(rt.z)-1.5)*0.12),
+        `런 ${rt.runs}회 (기대 ${rt.expected.toFixed(1)}), Z=${rt.z.toFixed(2)}, p=${rt.p.toFixed(3)} — ` +
+        (rt.z<0 ? '무작위보다 줄이 길다' : '무작위보다 교대가 잦다'));
+
+  // 열 길이 분포 (이론 평균 약 2.1칸)
+  if (done.length >= 8){
+    const avg = done.reduce((a,b)=>a+b,0)/done.length;
+    if (avg > 2.45)      add('longshoe', '장줄 슈', side, 0.16, `평균 열 길이 ${avg.toFixed(2)}칸 (이론 2.1) — 줄이 긴 슈`);
+    else if (avg < 1.75) add('chopshoe', '촙 슈', OPP(side), 0.16, `평균 열 길이 ${avg.toFixed(2)}칸 (이론 2.1) — 잘게 끊기는 슈`);
+  }
+
+  // 3연 이후 꺾임률 (슈 전체 통계)
+  if (cur === 3){
+    const c3 = done.filter(l => l >= 3);
+    const brk = c3.filter(l => l === 3).length;
+    if (c3.length >= 3)
+      add('break3', '3연 꺾임률', brk/c3.length > 0.5 ? OPP(side) : side,
+          Math.min(0.20, Math.abs(brk/c3.length - 0.5)*0.5),
+          `이 슈에서 3연 도달 ${c3.length}회 중 ${brk}회가 3에서 끊김 (${pct(brk/c3.length)})`);
+  }
+
+  if (nz.length >= 8){
+    const a = nz.slice(-4), b = nz.slice(-8,-4).slice().reverse();
+    if (eq(a,b)) add('mirror', '대칭(미러)', OPP(nz[nz.length-5]), 0.16, '최근 4판이 직전 4판의 거울상');
+  }
+
   const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
-  const dLast = [beb, sr, cp].map(a => a[a.length - 1]).filter(Boolean);
-  if (dLast.length === 3) {
+  const dLast = [beb,sr,cp].map(a => a[a.length-1]).filter(Boolean);
+  if (dLast.length === 3){
     const red = dLast.filter(v => v === 'R').length;
     if (red === 3 || red === 0)
-      add('파생로드 3색 일치', red === 3 ? side : OPP(side), 0.26,
+      add('road3', '파생로드 3색 일치', red===3?side:OPP(side), 0.26,
           `큰눈길·작은길·바퀴벌레길이 모두 ${red===3?'빨강(흐름 유지)':'파랑(흐름 전환)'}`);
     else
-      add('파생로드 우세', red >= 2 ? side : OPP(side), 0.12,
-          `파생로드 빨강 ${red}/3 — ${red>=2?'유지':'전환'} 쪽 우세`);
+      add('road2', '파생로드 우세', red>=2?side:OPP(side), 0.12, `파생로드 빨강 ${red}/3 — ${red>=2?'유지':'전환'} 우세`);
   }
 
-  /* 14. 타이 밀집 */
-  const last12 = hist.slice(-12), tCnt = last12.filter(v => v === 'T').length;
+  const tCnt = hist.slice(-12).filter(v => v === 'T').length;
   if (tCnt >= 2)
-    add('타이 밀집 주의', side, 0.0,
-        `최근 12판에 타이 ${tCnt}회 — 타이는 하우스 엣지 -14.4%로 베팅 비추천`);
+    add('tie', '타이 밀집 주의', side, 0.0, `최근 12판에 타이 ${tCnt}회 — 타이는 -14.4%라 베팅 비추천`);
 
   return out;
 }
 
+/* ---------------- 백테스트 (결과 분석 시스템) ---------------- */
+let btCache = {key:null, val:null};
+
+function runBacktest(hist){
+  const key = hist.join('');
+  if (btCache.key === key) return btCache.val;
+
+  const stats = {};                       // 패턴별 실적
+  const rec = {n:0, hit:0, pnl:0, curve:[], maxDD:0, loseStreak:0, worstStreak:0};
+  let peak = 0;
+
+  for (let i = 6; i < hist.length; i++){
+    const actual = hist[i];
+    if (actual === 'T') continue;
+    const ps = detectPatterns(hist.slice(0, i));
+    if (!ps.length) continue;
+
+    let score = 0.06;
+    for (const p of ps){
+      if (p.w <= 0) continue;
+      const st = stats[p.key] = stats[p.key] || {name:p.name.replace(/\s*\d+연|\s*\d+구간|\d+줄/g,'').trim() || p.key, n:0, hit:0, w:p.w};
+      st.n++; st.w = p.w;
+      if (p.side === actual) st.hit++;
+      score += (p.side === 'B' ? p.w : -p.w);
+    }
+    const pick = Math.abs(score) < 0.10 ? 'B' : (score > 0 ? 'B' : 'P');
+    rec.n++;
+    if (pick === actual){ rec.hit++; rec.pnl += (pick === 'B' ? 0.95 : 1); rec.loseStreak = 0; }
+    else { rec.pnl -= 1; rec.loseStreak++; rec.worstStreak = Math.max(rec.worstStreak, rec.loseStreak); }
+    peak = Math.max(peak, rec.pnl);
+    rec.maxDD = Math.max(rec.maxDD, peak - rec.pnl);
+    rec.curve.push(rec.pnl);
+  }
+  btCache = {key, val:{stats, rec}};
+  return btCache.val;
+}
+
+/* 실적 기반 적응형 가중치: 표본이 쌓일수록 실제 적중률로 가중치를 조정 */
+function adaptiveMult(st){
+  if (!st || st.n < 6) return 1;
+  const p = (st.hit + 2) / (st.n + 4);            // Agresti-Coull 축소추정
+  return Math.max(0, Math.min(1.8, 1 + 4*(p - 0.5)));
+}
+
+/* ---------------- 종합 분석 ---------------- */
 function analyze(hist){
   const nz = hist.filter(v => v !== 'T');
   const cols = bigRoadColumns(hist);
   const nB = nz.filter(v => v === 'B').length, nP = nz.length - nB;
   const nT = hist.length - nz.length;
-  const streak = cols.length ? cols[cols.length - 1].items.length : 0;
-  const streakSide = cols.length ? cols[cols.length - 1].side : null;
+  const streak = cols.length ? cols[cols.length-1].items.length : 0;
+  const streakSide = cols.length ? cols[cols.length-1].side : null;
 
   let alt = 0;
-  for (let i = 1; i < nz.length; i++) if (nz[i] !== nz[i-1]) alt++;
-  const altRate = nz.length > 1 ? alt / (nz.length - 1) : 0;
+  for (let i=1;i<nz.length;i++) if (nz[i] !== nz[i-1]) alt++;
+  const altRate = nz.length > 1 ? alt/(nz.length-1) : 0;
 
-  const lens = cols.slice(0, -1).map(c => c.items.length);
-  const cont = lens.filter(l => l > streak).length, ended = lens.filter(l => l === streak).length;
-  const contRate = (cont + ended) ? cont / (cont + ended) : null;
-
+  const bt = runBacktest(hist);
   const patterns = detectPatterns(hist);
+  for (const p of patterns){
+    const st = bt.stats[p.key];
+    p.n = st ? st.n : 0; p.hit = st ? st.hit : 0;
+    p.rate = st && st.n ? st.hit/st.n : null;
+    p.ci = st && st.n ? wilson(st.hit, st.n) : null;
+    p.mult = adaptiveMult(st);
+    p.wEff = p.w * p.mult;
+  }
 
-  /* 점수 합산: + = 뱅커, - = 플레이어 */
-  let score = 0.06;                       // 뱅커 하우스 엣지 우위
-  for (const p of patterns) score += (p.side === 'B' ? p.w : -p.w);
+  let score = 0.06;
+  for (const p of patterns) score += (p.side === 'B' ? p.wEff : -p.wEff);
 
-  const conf = Math.min(1, Math.abs(score) / 0.9);
+  const conf = Math.min(1, Math.abs(score)/0.9);
   let pick;
   if (hist.length < 8) pick = 'SKIP';
   else if (Math.abs(score) < 0.10) pick = 'B';
   else pick = score > 0 ? 'B' : 'P';
 
   const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
-  return {pick, conf, patterns, nB, nP, nT, streak, streakSide, altRate, contRate, cols, beb, sr, cp, score};
+  const lens = cols.slice(0,-1).map(c => c.items.length);
+  const contRate = (() => {
+    const c = lens.filter(l=>l>streak).length, e = lens.filter(l=>l===streak).length;
+    return (c+e) ? c/(c+e) : null;
+  })();
+  const avgCol = lens.length ? lens.reduce((a,b)=>a+b,0)/lens.length : null;
+
+  return {pick, conf, patterns, bt, nB, nP, nT, streak, streakSide, altRate, contRate,
+          avgCol, cols, beb, sr, cp, score,
+          runs: runsTest(nz), chi: chiSquare(nB,nP), H: entropy(nz),
+          ac2: autocorr(nz,2), ac3: autocorr(nz,3)};
 }
 
 /* ---------------- 렌더 ---------------- */
+const pctS = v => v==null ? '-' : (v*100).toFixed(1)+'%';
+
 function render(){
   const hist = S.history;
   document.getElementById('seq').textContent = hist.length
@@ -606,44 +794,129 @@ function render(){
 
   const a = analyze(hist);
   S.pendingRec = hist.length >= 8 ? a.pick : null;
+  S.lastAnalysis = a;
 
-  const pickEl = document.getElementById('pick');
+  /* 4. 추천 */
   const names = {B:'뱅커 (BANKER)', P:'플레이어 (PLAYER)', SKIP:'관망'};
+  const pickEl = document.getElementById('pick');
   pickEl.textContent = names[a.pick];
   pickEl.style.color = a.pick==='B' ? '#ff7b85' : a.pick==='P' ? '#79aaff' : '#aab';
   document.getElementById('confBar').style.width = (a.conf*100).toFixed(0)+'%';
-  const sig = a.patterns.filter(p => p.w > 0);
+
+  const sig = a.patterns.filter(p => p.wEff > 0.02);
+  const top = sig.slice().sort((x,y)=>y.wEff-x.wEff).slice(0,3).map(p=>p.name).join(', ');
+  const bp = binomP(a.bt.rec.hit, a.bt.rec.n);
   document.getElementById('why').innerHTML = hist.length < 8
     ? '표본이 8판 미만입니다. 관망을 권장합니다.'
-    : `감지된 패턴 ${sig.length}개 · 종합점수 ${a.score.toFixed(2)} · 신뢰도 ${(a.conf*100).toFixed(0)}%`
-      + (sig.length ? `<br>주요 근거: ${sig.slice().sort((x,y)=>y.w-x.w).slice(0,3).map(p=>p.name).join(', ')}` : '<br>뚜렷한 패턴 없음 — 기본값(뱅커)')
+    : `감지 패턴 ${sig.length}개 · 종합점수 ${a.score.toFixed(2)} · 신뢰도 ${(a.conf*100).toFixed(0)}%`
+      + (top ? `<br>주요 근거: ${top}` : '<br>뚜렷한 패턴 없음 — 기본값(뱅커)')
+      + (a.bt.rec.n >= 10
+          ? `<br>이 슈 백테스트 적중 ${pctS(a.bt.rec.hit/a.bt.rec.n)} (${a.bt.rec.hit}/${a.bt.rec.n}, p=${bp.toFixed(3)})`
+            + (bp > 0.05 ? ' <b style="color:#ffce8a">→ 무작위와 구분 안 됨</b>' : '')
+          : '')
       + '<br><span style="opacity:.6">※ 신뢰도는 패턴 일관성 지표일 뿐, 적중 확률이 아닙니다.</span>';
 
+  /* 5. 감지된 패턴 */
   const pl = document.getElementById('plist');
   pl.innerHTML = a.patterns.length ? a.patterns.map(p => `
     <div class="pit">
-      <span class="tag ${p.w>0?p.side:'N'}">${p.w>0?(p.side==='B'?'뱅커':'플레이어'):'참고'}</span>
+      <span class="tag ${p.wEff>0.02?p.side:'N'}">${p.wEff>0.02?(p.side==='B'?'뱅커':'플레이어'):'참고'}</span>
       <div><div class="nm">${p.name}</div><div class="ds">${p.desc}</div></div>
-      <span class="wt">${p.w>0?'가중치 '+p.w.toFixed(2):'-'}</span>
-    </div>`).join('') : '<div class="ds" style="opacity:.5;font-size:12px">아직 감지된 패턴이 없습니다 (최소 6판 필요)</div>';
+      <span class="wt">${p.w>0 ? `${p.wEff.toFixed(2)}<br><span style="opacity:.7">×${p.mult.toFixed(2)}</span>` : '-'}</span>
+    </div>`).join('') : '<div style="opacity:.5;font-size:12px">아직 감지된 패턴이 없습니다 (최소 6판 필요)</div>';
 
+  /* 6. 패턴별 실적 */
+  const rows = Object.entries(a.bt.stats).sort((x,y)=>y[1].n-x[1].n).map(([k,st])=>{
+    const [lo,hi] = wilson(st.hit, st.n), rate = st.hit/st.n, pv = binomP(st.hit, st.n);
+    const useful = lo > 0.5;
+    const color = useful ? '#45e08a' : (hi < 0.5 ? '#ff7b85' : 'inherit');
+    return `<tr><td>${st.name}</td><td>${st.hit}/${st.n}</td>
+      <td style="color:${color}">${pctS(rate)}</td>
+      <td style="opacity:.7">${pctS(lo)}~${pctS(hi)}</td>
+      <td style="opacity:.7">${pv.toFixed(3)}</td>
+      <td>×${adaptiveMult(st).toFixed(2)}</td></tr>`;
+  }).join('');
+  document.querySelector('#ptable tbody').innerHTML = rows
+    ? `<tr><th>패턴</th><th>적중</th><th>확률</th><th>95% CI</th><th>p</th><th>가중</th></tr>${rows}`
+    : '<tr><td style="opacity:.5">백테스트할 기록이 부족합니다 (최소 8판)</td></tr>';
+
+  /* 7. 무작위성 검정 */
+  const rt = a.runs, ch = a.chi;
+  const verdict = (p, label) => p == null ? '-' :
+    `${p.toFixed(3)} ${p < 0.05 ? `<b style="color:#45e08a">${label} 유의</b>` : '<span style="opacity:.6">무작위와 구분 안 됨</span>'}`;
+  document.querySelector('#rand tbody').innerHTML = `
+    <tr><th>런 검정 (Z / p)</th><td>${rt ? `${rt.z.toFixed(2)} / ${verdict(rt.p, rt.z<0?'뭉침':'과교대')}` : '표본 부족'}</td></tr>
+    <tr><th>런 수 (관측/기대)</th><td>${rt ? `${rt.runs} / ${rt.expected.toFixed(1)}` : '-'}</td></tr>
+    <tr><th>카이제곱 (B/P 비율)</th><td>${ch ? `${ch.x2.toFixed(2)} / ${verdict(ch.p, '편향')}` : '표본 부족'}</td></tr>
+    <tr><th>조건부 엔트로피</th><td>${a.H!=null ? `${a.H.toFixed(3)} bit ${a.H>0.98?'<span style="opacity:.6">(거의 완전 무작위)</span>':''}` : '-'}</td></tr>
+    <tr><th>자기상관 lag-2 / lag-3</th><td>${a.ac2!=null?a.ac2.toFixed(3):'-'} / ${a.ac3!=null?a.ac3.toFixed(3):'-'}</td></tr>`;
+
+  /* 8. 슈 통계 */
   const tot = a.nB + a.nP;
   document.querySelector('#stats tbody').innerHTML = `
     <tr><th>총 판수</th><td>${hist.length} (타이 ${a.nT} 제외 ${tot})</td></tr>
-    <tr><th>뱅커 / 플레이어</th><td>${a.nB} (${tot?(a.nB/tot*100).toFixed(1):0}%) / ${a.nP} (${tot?(a.nP/tot*100).toFixed(1):0}%)</td></tr>
+    <tr><th>뱅커 / 플레이어</th><td>${a.nB} (${pctS(tot?a.nB/tot:null)}) / ${a.nP} (${pctS(tot?a.nP/tot:null)})</td></tr>
     <tr><th>현재 줄</th><td>${a.streakSide?`${a.streakSide==='B'?'뱅커':'플레이어'} ${a.streak}연속`:'-'}</td></tr>
-    <tr><th>교대(핑퐁)율</th><td>${(a.altRate*100).toFixed(1)}%</td></tr>
-    <tr><th>줄 연장률</th><td>${a.contRate!=null?(a.contRate*100).toFixed(0)+'%':'표본 부족'}</td></tr>
+    <tr><th>열 개수 / 평균 길이</th><td>${a.cols.length} / ${a.avgCol!=null?a.avgCol.toFixed(2)+'칸':'-'} <span style="opacity:.5">(이론 2.1)</span></td></tr>
+    <tr><th>교대(핑퐁)율</th><td>${pctS(a.altRate)}</td></tr>
+    <tr><th>줄 연장률</th><td>${a.contRate!=null?pctS(a.contRate):'표본 부족'}</td></tr>
     <tr><th>이론 기대값</th><td>뱅커 -1.06% · 플레이어 -1.24% · 타이 -14.4%</td></tr>`;
 
-  const p = S.perf;
-  document.querySelector('#perf tbody').innerHTML = `
-    <tr><th>평가된 추천</th><td>${p.n}회</td></tr>
-    <tr><th>적중</th><td>${p.hit}회 (${p.n?(p.hit/p.n*100).toFixed(1):0}%)</td></tr>
-    <tr><th>누적 손익</th><td style="color:${p.pnl>=0?'#45e08a':'#ff7b85'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(2)} 유닛</td></tr>`;
+  /* 9. 자금 관리 */
+  renderMoney(a);
 
   drawRoad('bigRoad', a.cols);
   drawDerived('beb', a.beb); drawDerived('sr', a.sr); drawDerived('cp', a.cp);
+}
+
+function renderMoney(a){
+  const bank = +document.getElementById('bank').value || 0;
+  const unit = +document.getElementById('unit').value || 1;
+  const kf   = (+document.getElementById('kelly').value || 0)/100;
+  const r = a.bt.rec, p = S.perf;
+
+  // 켈리: 뱅커는 0.95배 지급 → b=0.95, 플레이어 b=1
+  let kelly = null, edge = null;
+  if (r.n >= 20){
+    const ph = (r.hit + 2)/(r.n + 4);
+    const b = a.pick === 'B' ? 0.95 : 1;
+    edge = ph*b - (1-ph);
+    kelly = edge / b;
+  }
+  const bet = kelly != null && kelly > 0 ? Math.max(unit, Math.round(bank*kelly*kf/unit)*unit) : 0;
+
+  document.querySelector('#perf tbody').innerHTML = `
+    <tr><th>백테스트 적중</th><td>${r.n?`${r.hit}/${r.n} (${pctS(r.hit/r.n)}) · p=${binomP(r.hit,r.n).toFixed(3)}</td>`:'표본 부족</td>'}</tr>
+    <tr><th>백테스트 손익</th><td style="color:${r.pnl>=0?'#45e08a':'#ff7b85'}">${r.pnl>=0?'+':''}${r.pnl.toFixed(2)} 유닛 (${(r.pnl*unit>=0?'+':'')}${(r.pnl*unit).toFixed(0)})</td></tr>
+    <tr><th>최대 낙폭 / 최다 연패</th><td>${r.maxDD.toFixed(2)} 유닛 / ${r.worstStreak}연패</td></tr>
+    <tr><th>실시간 추천 성적</th><td>${p.n?`${p.hit}/${p.n} (${pctS(p.hit/p.n)}) · ${p.pnl>=0?'+':''}${p.pnl.toFixed(2)} 유닛`:'아직 없음'}</td></tr>
+    <tr><th>추정 기대우위</th><td>${edge!=null?`${(edge*100).toFixed(2)}%`:'표본 20판 필요'}</td></tr>
+    <tr><th>켈리 권장 베팅</th><td>${
+      kelly == null ? '<span style="opacity:.6">표본 부족</span>' :
+      kelly <= 0 ? '<b style="color:#ffce8a">0 — 기대값이 음수이므로 베팅 비권장</b>' :
+      `${bet.toLocaleString()} (뱅크롤의 ${(kelly*kf*100).toFixed(1)}%)<br><span style="opacity:.6">※ 표본 편향일 가능성이 큽니다</span>`}</td></tr>`;
+
+  // 손익 곡선
+  const cv = document.getElementById('curve');
+  const w = cv.clientWidth || 300; cv.width = w;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,w,cv.height);
+  const c = r.curve;
+  const mid = cv.height/2;
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.moveTo(0,mid); ctx.lineTo(w,mid); ctx.stroke();
+  if (c.length > 1){
+    const mn = Math.min(0, ...c), mx = Math.max(0, ...c), rng = (mx-mn)||1;
+    ctx.strokeStyle = c[c.length-1] >= 0 ? '#45e08a' : '#ff7b85';
+    ctx.lineWidth = 2; ctx.beginPath();
+    c.forEach((v,i)=>{
+      const x = i/(c.length-1)*w, y = cv.height - 4 - (v-mn)/rng*(cv.height-8);
+      i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    });
+    ctx.stroke();
+  } else {
+    ctx.fillStyle='rgba(255,255,255,.35)'; ctx.font='11px sans-serif';
+    ctx.fillText('기록이 쌓이면 손익 곡선이 그려집니다', 10, mid+4);
+  }
 }
 
 function drawRoad(id, cols){
@@ -658,8 +931,8 @@ function drawRoad(id, cols){
       d.appendChild(s);
     }
     if (c.items.length > 6){
-      const s = document.createElement('div'); s.className='cell '+c.side; s.textContent = '+'+(c.items.length-6);
-      d.appendChild(s);
+      const s = document.createElement('div'); s.className='cell '+c.side;
+      s.textContent = '+'+(c.items.length-6); d.appendChild(s);
     }
     el.appendChild(d);
   }
@@ -670,7 +943,6 @@ function drawDerived(id, arr){
   const el = document.getElementById(id); el.innerHTML='';
   const view = arr.slice(-60);
   if (!view.length){ el.innerHTML='<span style="font-size:12px;opacity:.5">표본 부족</span>'; return; }
-  // 6행 세로 배치
   for (let i=0;i<view.length;i+=6){
     const d = document.createElement('div'); d.className='rcol';
     for (const v of view.slice(i,i+6)){
@@ -681,6 +953,46 @@ function drawDerived(id, arr){
     el.appendChild(d);
   }
 }
+
+/* ---------------- 세션 저장 / 내보내기 ---------------- */
+const msg = t => document.getElementById('sessMsg').textContent = t;
+
+function saveSession(){
+  try {
+    localStorage.setItem('baccarat-bot', JSON.stringify({h:S.history, perf:S.perf, t:Date.now()}));
+    msg(`저장 완료 (${S.history.length}판)`);
+  } catch(e){ msg('저장 실패: ' + e.message); }
+}
+function loadSession(){
+  try {
+    const d = JSON.parse(localStorage.getItem('baccarat-bot') || 'null');
+    if (!d) return msg('저장된 기록이 없습니다.');
+    S.history = d.h || []; S.perf = d.perf || {n:0,hit:0,pnl:0};
+    render(); msg(`불러오기 완료 (${S.history.length}판, ${new Date(d.t).toLocaleString()})`);
+  } catch(e){ msg('불러오기 실패: ' + e.message); }
+}
+function exportCSV(){
+  const a = S.lastAnalysis || analyze(S.history);
+  const lines = ['idx,result'];
+  S.history.forEach((v,i)=>lines.push(`${i+1},${v}`));
+  lines.push('', 'pattern,hit,n,rate');
+  for (const [k,st] of Object.entries(a.bt.stats))
+    lines.push(`${st.name},${st.hit},${st.n},${(st.hit/st.n).toFixed(4)}`);
+  const url = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/csv'}));
+  const el = document.createElement('a');
+  el.href = url; el.download = `baccarat-${Date.now()}.csv`; el.click();
+  URL.revokeObjectURL(url); msg('CSV를 내려받았습니다.');
+}
+function importPrompt(){
+  const t = prompt('결과를 B/P/T 문자열로 붙여넣으세요 (예: BBPTPBB)');
+  if (t == null) return;
+  const h = t.toUpperCase().replace(/[^BPT]/g,'').split('');
+  if (!h.length) return msg('인식된 결과가 없습니다.');
+  S.history = h; render(); msg(`${h.length}판을 불러왔습니다.`);
+}
+
+['bank','unit','kelly'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () => renderMoney(S.lastAnalysis || analyze(S.history))));
 
 ['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('input', applyBox));
 window.addEventListener('resize', applyBox);
