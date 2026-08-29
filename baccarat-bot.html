@@ -51,6 +51,25 @@
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
   th{opacity:.6;font-weight:500}
+  .verdict{display:flex;gap:8px;margin:10px 0 4px}
+  .vhalf{flex:1;border-radius:8px;padding:8px;text-align:center;background:rgba(255,255,255,.06)}
+  .vhalf.on{background:rgba(69,224,138,.18);border:1px solid rgba(69,224,138,.5)}
+  .vhalf .vt{font-size:15px;font-weight:700}
+  .vhalf .vp{font-size:11px;opacity:.7;margin-top:2px}
+  .betline{margin-top:10px;padding:10px;border-radius:8px;background:rgba(43,108,246,.15);
+        border:1px solid rgba(43,108,246,.4)}
+  .betline .amt{font-size:26px;font-weight:700}
+  .betline .bn{font-size:11.5px;opacity:.75;margin-top:4px;line-height:1.5}
+  .lib{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.14);
+        border-radius:14px;padding:3px 8px;font-size:11.5px}
+  .chip.hit{border-color:#45e08a;background:rgba(69,224,138,.16)}
+  .chip.off{opacity:.4}
+  .chip b{font-family:monospace}
+  .chip i{cursor:pointer;font-style:normal;opacity:.5}
+  .chip i:hover{opacity:1;color:#ff7b85}
+  select{background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.2);
+        border-radius:6px;padding:4px 6px;font-size:12px;margin-right:10px}
   .plist{display:flex;flex-direction:column;gap:6px}
   .pit{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border-radius:8px;padding:7px 9px}
   .pit .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;flex:0 0 auto}
@@ -142,46 +161,81 @@
         <div class="rec">
           <div class="pick" id="pick">-</div>
           <div class="conf"><i id="confBar" style="width:0%"></i></div>
+          <div class="verdict">
+            <div class="vhalf" id="vFollow"><div class="vt">쭉 (유지)</div><div class="vp">-</div></div>
+            <div class="vhalf" id="vBreak"><div class="vt">꺾임 (전환)</div><div class="vp">-</div></div>
+          </div>
+          <div class="betline">
+            <div style="font-size:11px;opacity:.7">권장 베팅 금액</div>
+            <div class="amt" id="betAmt">-</div>
+            <div class="bn" id="betNote"></div>
+          </div>
           <div class="why" id="why">기록이 쌓이면 분석을 시작합니다.</div>
         </div>
       </div>
 
       <div class="panel">
-        <h2>5. 감지된 패턴</h2>
+        <h2>5. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
+        <input id="patIn" placeholder="예: BBB · BPBP · 1-2-1-2" style="width:150px;background:rgba(0,0,0,.35);
+          color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:5px 7px;font-size:12px">
+        <button onclick="addPattern()">패턴 추가</button>
+        <button class="ghost" onclick="resetPatterns()">기본값 복원</button>
+        <div class="lib" id="lib"></div>
+        <div class="hint">
+          <b>B/P 문자열</b>은 <b>모양</b>으로 인식합니다 — <code>BBP</code>는 "두 번 같은 쪽 뒤 반대"라는 뜻이라
+          <code>PPB</code>도 같은 패턴으로 봅니다. <b>1-2-1-2</b> 처럼 숫자를 넣으면 <b>열 길이 주기</b>로 봅니다.<br>
+          현재 모양과 일치한 패턴은 초록으로 표시되고, <b>이 슈에서 그 모양 다음에 실제로 쭉 갔는지 꺾였는지</b>를
+          세어 스스로 방향을 정합니다.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>6. 감지된 패턴</h2>
         <div class="plist" id="plist"></div>
       </div>
 
       <div class="panel">
-        <h2>6. 패턴별 실적 (백테스트)</h2>
+        <h2>7. 패턴별 실적 (백테스트)</h2>
         <table id="ptable"><tbody></tbody></table>
         <div class="hint">이 슈의 기록을 처음부터 되돌려(백테스트) 각 패턴이 실제로 몇 번 맞았는지 계산합니다.
           Wilson 95% 신뢰구간이 50%를 포함하면 <b>우연과 구분되지 않는다</b>는 뜻이며, 그런 패턴은 가중치가 자동으로 낮아집니다.</div>
       </div>
 
       <div class="panel">
-        <h2>7. 무작위성 검정</h2>
+        <h2>8. 무작위성 검정</h2>
         <table id="rand"><tbody></tbody></table>
         <div class="hint">런 검정 · 카이제곱 · 엔트로피로 "이 슈가 정말 무작위와 다른가"를 통계적으로 확인합니다.</div>
       </div>
 
       <div class="panel">
-        <h2>8. 슈 통계</h2>
+        <h2>9. 슈 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>9. 자금 관리 & 성적</h2>
+        <h2>10. 자금 관리 & 성적</h2>
         <div style="margin-bottom:10px">
           <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px">
           <label>1유닛</label><input type="number" id="unit" value="10" min="1" style="width:60px">
           <label>켈리 비율</label><input type="number" id="kelly" value="25" min="0" max="100" style="width:52px"><span style="font-size:11px;opacity:.6">%</span>
+        </div>
+        <div style="margin-bottom:10px">
+          <label>베팅 전략</label>
+          <select id="strat">
+            <option value="flat">플랫 (항상 1유닛)</option>
+            <option value="conf">신뢰도 비례 (1~4유닛)</option>
+            <option value="kelly">프랙셔널 켈리</option>
+            <option value="1326">1-3-2-6</option>
+            <option value="marti">마틴게일 (위험)</option>
+          </select>
+          <button class="ghost" onclick="resetStake()" style="padding:4px 10px">단계 초기화</button>
         </div>
         <canvas id="curve" height="70" style="width:100%;background:rgba(0,0,0,.25);border-radius:8px"></canvas>
         <table id="perf" style="margin-top:8px"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>10. 세션</h2>
+        <h2>11. 세션</h2>
         <button class="ghost" onclick="saveSession()">저장</button>
         <button class="ghost" onclick="loadSession()">불러오기</button>
         <button class="ghost" onclick="exportCSV()">CSV 내보내기</button>
@@ -200,6 +254,8 @@ const S = {
   region: null,         // {x,y,w,h} in video pixel coords
   lastRead: null, stableCount: 0,
   pendingRec: null,     // 직전 추천 (성적 추적용)
+  custom: [],           // 사용자 패턴 라이브러리
+  bet: {step:0, idx:0}, // 진행형 베팅 전략 단계
   perf: {n:0, hit:0, pnl:0}
 };
 
@@ -407,16 +463,20 @@ function gridToSequence(grid, rows, cols){
 /* ---------------- 수동 입력 ---------------- */
 function manual(v){ addResult(v); }
 function undo(){ S.history.pop(); S.lastRead=null; render(); }
-function resetAll(){ S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0}; render(); }
+function resetAll(){ S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0,money:0}; S.bet={step:0,idx:0}; render(); }
 
 function addResult(v){
-  // 직전 추천 성적 반영
-  if (S.pendingRec && S.pendingRec !== 'SKIP'){
-    if (v !== 'T'){
-      S.perf.n++;
-      if (v === S.pendingRec){ S.perf.hit++; S.perf.pnl += (v==='B' ? 0.95 : 1); }
-      else S.perf.pnl -= 1;
-    }
+  // 직전 추천 성적 + 베팅 단계 반영
+  if (S.pendingRec && S.pendingRec !== 'SKIP' && v !== 'T'){
+    const stake = S.pendingBet || 0;
+    const unit  = +document.getElementById('unit').value || 1;
+    const units = stake / unit;
+    const won   = v === S.pendingRec;
+    S.perf.n++;
+    if (won){ S.perf.hit++; S.perf.pnl += units * (v === 'B' ? 0.95 : 1); }
+    else S.perf.pnl -= units;
+    S.perf.money = (S.perf.money || 0) + (won ? stake * (v === 'B' ? 0.95 : 1) : -stake);
+    if (stake > 0) advanceStake(won);
   }
   S.history.push(v);
   render();
@@ -513,6 +573,77 @@ function autocorr(seq, lag){
   let num = 0, den = 0;
   for (let i=0;i<x.length;i++){ den += (x[i]-m)**2; if (i>=lag) num += (x[i]-m)*(x[i-lag]-m); }
   return den ? num/den : null;
+}
+
+
+/* ---------------- 패턴 라이브러리 (쭉 / 꺾임 자가 판단) ---------------- */
+const DEFAULT_PATTERNS = [
+  '1-2-1-2', '2-1-2-1', '1-3-1-3', '2-2-2', '3-3-3', '1-2-3',
+  'BBB', 'BBBB', 'BPBP', 'BBPP', 'BBBP', 'BPPB', 'BBPB', 'BPBB'
+];
+
+// 모양 정규화: 첫 결과를 A로 두고 같으면 A, 다르면 B → BBP 와 PPB 를 같은 패턴으로 취급
+const shapeOf = a => a.map(v => v === a[0] ? 'A' : 'B').join('');
+
+function parsePattern(raw){
+  const t = String(raw).trim().toUpperCase();
+  if (/^[BP]{2,10}$/.test(t))        return {raw:t, type:'seq', arr:t.split('')};
+  if (/^\d+(-\d+)+$/.test(t)){
+    const arr = t.split('-').map(Number);
+    if (arr.length >= 2 && arr.length <= 8 && arr.every(v => v >= 1 && v <= 12))
+      return {raw:t, type:'len', arr};
+  }
+  return null;
+}
+
+/* 등록된 패턴이 지금 모양과 맞으면, 이 슈에서 그 모양 다음에
+   실제로 "쭉 갔는지 / 꺾였는지"를 세어 스스로 방향을 정한다 */
+function libraryDetect(hist, nz, done, cur, side, add){
+  for (const pat of (S.custom.length ? S.custom : [])){
+    if (pat.off) continue;
+
+    if (pat.type === 'seq'){
+      const n = pat.arr.length;
+      if (nz.length < n + 2) continue;
+      const want = shapeOf(pat.arr);
+      if (shapeOf(nz.slice(-n)) !== want) continue;        // 지금 모양이 아님
+
+      let follow = 0, brk = 0;                              // 과거 같은 모양 뒤의 결과
+      for (let i = 0; i + n < nz.length; i++){
+        if (shapeOf(nz.slice(i, i+n)) !== want) continue;
+        (nz[i+n] === nz[i+n-1] ? follow++ : brk++);
+      }
+      const tot = follow + brk;
+      const go = tot >= 3 ? follow > brk : null;            // 표본이 없으면 판단 보류
+      const margin = tot ? Math.abs(follow - brk)/tot : 0;
+      add('lib:'+pat.raw, `📗 ${pat.raw} ${go===null?'(표본부족)':(go?'→ 쭉':'→ 꺾임')}`,
+          go === null ? side : (go ? side : OPP(side)),
+          go === null ? 0 : Math.min(0.34, margin*0.4 + tot*0.015),
+          tot >= 3
+            ? `이 슈에서 같은 모양 ${tot}회 → 쭉 ${follow} / 꺾임 ${brk} (${(Math.max(follow,brk)/tot*100).toFixed(0)}%)`
+            : `모양은 일치하지만 이 슈의 과거 표본이 ${tot}회뿐 — 판단 보류`);
+    }
+
+    else {                                                  // 열 길이 주기
+      const n = pat.arr.length;
+      if (done.length < n) continue;
+      const tail = done.slice(-n);
+      if (!tail.every((v,i) => v === pat.arr[i])) continue;  // 주기가 안 맞음
+      const expected = pat.arr[0];                           // 주기가 한 바퀴 돌아 처음 값
+
+      let ok = 0, no = 0;                                    // 과거 같은 주기 뒤 실제 열 길이
+      for (let i = 0; i + n < done.length; i++){
+        if (!pat.arr.every((v,j) => done[i+j] === v)) continue;
+        (done[i+n] === expected ? ok++ : no++);
+      }
+      const tot = ok + no, rel = tot ? ok/tot : 0.5;
+      add('lib:'+pat.raw, `📗 ${pat.raw} (열 주기)`,
+          fromExpected(expected, cur, side),
+          Math.min(0.30, 0.14 + rel*0.16 + tot*0.02),
+          `열 길이 ${tail.join('-')} 주기 일치 · 이번 열 예상 ${expected}칸 (현재 ${cur}칸)` +
+          (tot ? ` · 과거 ${tot}회 중 ${ok}회 주기 유지` : ''));
+    }
+  }
 }
 
 /* ---------------- 패턴 감지 ---------------- */
@@ -685,6 +816,8 @@ function detectPatterns(hist){
       add('road2', '파생로드 우세', red>=2?side:OPP(side), 0.12, `파생로드 빨강 ${red}/3 — ${red>=2?'유지':'전환'} 우세`);
   }
 
+  libraryDetect(hist, nz, done, cur, side, add);
+
   const tCnt = hist.slice(-12).filter(v => v === 'T').length;
   if (tCnt >= 2)
     add('tie', '타이 밀집 주의', side, 0.0, `최근 12판에 타이 ${tCnt}회 — 타이는 -14.4%라 베팅 비추천`);
@@ -769,6 +902,19 @@ function analyze(hist){
   else if (Math.abs(score) < 0.10) pick = 'B';
   else pick = score > 0 ? 'B' : 'P';
 
+  /* 쭉(유지) vs 꺾임(전환) 판정 — 현재 진행 중인 쪽 기준 */
+  let follow = 0, brk = 0;
+  for (const p of patterns){
+    if (p.wEff <= 0.02) continue;
+    (p.side === streakSide ? follow += p.wEff : brk += p.wEff);
+  }
+  const vTot = follow + brk;
+  const verdict = {
+    follow, brk,
+    fPct: vTot ? follow/vTot : 0.5,
+    dir: vTot === 0 ? null : (follow >= brk ? 'follow' : 'break')
+  };
+
   const beb = derivedRoad(cols,1), sr = derivedRoad(cols,2), cp = derivedRoad(cols,3);
   const lens = cols.slice(0,-1).map(c => c.items.length);
   const contRate = (() => {
@@ -777,7 +923,7 @@ function analyze(hist){
   })();
   const avgCol = lens.length ? lens.reduce((a,b)=>a+b,0)/lens.length : null;
 
-  return {pick, conf, patterns, bt, nB, nP, nT, streak, streakSide, altRate, contRate,
+  return {pick, conf, patterns, bt, verdict, nB, nP, nT, streak, streakSide, altRate, contRate,
           avgCol, cols, beb, sr, cp, score,
           runs: runsTest(nz), chi: chiSquare(nB,nP), H: entropy(nz),
           ac2: autocorr(nz,2), ac3: autocorr(nz,3)};
@@ -802,6 +948,23 @@ function render(){
   pickEl.textContent = names[a.pick];
   pickEl.style.color = a.pick==='B' ? '#ff7b85' : a.pick==='P' ? '#79aaff' : '#aab';
   document.getElementById('confBar').style.width = (a.conf*100).toFixed(0)+'%';
+
+  /* 쭉 / 꺾임 판정 */
+  const v = a.verdict, vf = document.getElementById('vFollow'), vb = document.getElementById('vBreak');
+  const sideName = a.streakSide === 'B' ? '뱅커' : a.streakSide === 'P' ? '플레이어' : '-';
+  vf.classList.toggle('on', v.dir === 'follow');
+  vb.classList.toggle('on', v.dir === 'break');
+  vf.querySelector('.vp').innerHTML = v.dir ? `${(v.fPct*100).toFixed(0)}% · ${sideName} 유지` : '표본 부족';
+  vb.querySelector('.vp').innerHTML = v.dir ? `${((1-v.fPct)*100).toFixed(0)}% · ${sideName} 끊김` : '표본 부족';
+
+  /* 베팅 금액 */
+  const bet = computeBet(a);
+  S.pendingBet = bet.amt;
+  document.getElementById('betAmt').textContent = bet.amt ? bet.amt.toLocaleString() : '0 (관망)';
+  document.getElementById('betAmt').style.color = bet.amt ? '#8fb4ff' : '#aab';
+  document.getElementById('betNote').innerHTML = bet.note;
+
+  renderLib(a);
 
   const sig = a.patterns.filter(p => p.wEff > 0.02);
   const top = sig.slice().sort((x,y)=>y.wEff-x.wEff).slice(0,3).map(p=>p.name).join(', ');
@@ -890,6 +1053,8 @@ function renderMoney(a){
     <tr><th>백테스트 손익</th><td style="color:${r.pnl>=0?'#45e08a':'#ff7b85'}">${r.pnl>=0?'+':''}${r.pnl.toFixed(2)} 유닛 (${(r.pnl*unit>=0?'+':'')}${(r.pnl*unit).toFixed(0)})</td></tr>
     <tr><th>최대 낙폭 / 최다 연패</th><td>${r.maxDD.toFixed(2)} 유닛 / ${r.worstStreak}연패</td></tr>
     <tr><th>실시간 추천 성적</th><td>${p.n?`${p.hit}/${p.n} (${pctS(p.hit/p.n)}) · ${p.pnl>=0?'+':''}${p.pnl.toFixed(2)} 유닛`:'아직 없음'}</td></tr>
+    <tr><th>실제 누적 손익</th><td style="color:${(p.money||0)>=0?'#45e08a':'#ff7b85'}">${(p.money||0)>=0?'+':''}${(p.money||0).toLocaleString()}</td></tr>
+    <tr><th>베팅 전략 단계</th><td>${document.getElementById('strat').value==='1326'?`1-3-2-6 ${S.bet.idx+1}단계`:document.getElementById('strat').value==='marti'?`마틴 ${S.bet.step+1}단계`:'-'}</td></tr>
     <tr><th>추정 기대우위</th><td>${edge!=null?`${(edge*100).toFixed(2)}%`:'표본 20판 필요'}</td></tr>
     <tr><th>켈리 권장 베팅</th><td>${
       kelly == null ? '<span style="opacity:.6">표본 부족</span>' :
@@ -954,12 +1119,116 @@ function drawDerived(id, arr){
   }
 }
 
+
+/* ---------------- 베팅 금액 추천 ---------------- */
+const SEQ1326 = [1,3,2,6];
+
+function computeBet(a){
+  const bank = +document.getElementById('bank').value || 0;
+  const unit = +document.getElementById('unit').value || 1;
+  const kf   = (+document.getElementById('kelly').value || 0)/100;
+  const strat= document.getElementById('strat').value;
+  const r    = a.bt.rec;
+
+  if (a.pick === 'SKIP')
+    return {amt:0, note:'표본 8판 미만 — 관망하세요.'};
+
+  // 추정 기대우위 (백테스트 적중률 축소추정 기반)
+  let edge = null;
+  if (r.n >= 20){
+    const ph = (r.hit + 2)/(r.n + 4), b = a.pick === 'B' ? 0.95 : 1;
+    edge = ph*b - (1-ph);
+  }
+
+  let amt, note;
+  switch (strat){
+    case 'flat':
+      amt = unit; note = '플랫 베팅 — 매판 1유닛 고정. 파산 위험이 가장 낮습니다.'; break;
+
+    case 'conf': {
+      const mult = 1 + Math.round(a.conf * 3);
+      amt = unit * mult;
+      note = `신뢰도 ${(a.conf*100).toFixed(0)}% → ${mult}유닛. 패턴이 뚜렷할 때만 키웁니다.`;
+      break;
+    }
+    case 'kelly': {
+      if (edge == null){ amt = unit; note = '켈리 계산에 필요한 표본(20판)이 부족해 1유닛으로 대체합니다.'; break; }
+      const b = a.pick === 'B' ? 0.95 : 1, k = edge/b;
+      if (k <= 0){
+        amt = 0;
+        note = `추정 기대우위 ${(edge*100).toFixed(2)}% — 음수입니다. 켈리 기준 베팅액은 0, 즉 <b>베팅하지 않는 것</b>이 정답입니다.`;
+      } else {
+        amt = Math.max(unit, Math.round(bank*k*kf/unit)*unit);
+        note = `기대우위 ${(edge*100).toFixed(2)}% · 켈리 ${(k*100).toFixed(1)}%의 ${(kf*100).toFixed(0)}% → 뱅크롤의 ${(k*kf*100).toFixed(1)}%`;
+      }
+      break;
+    }
+    case '1326': {
+      const m = SEQ1326[S.bet.idx % 4];
+      amt = unit * m;
+      note = `1-3-2-6 ${S.bet.idx+1}단계 (${m}유닛). 이기면 다음 단계, 지면 1단계로 돌아갑니다.`;
+      break;
+    }
+    case 'marti': {
+      const step = Math.min(S.bet.step, 8);
+      amt = unit * Math.pow(2, step);
+      note = `마틴게일 ${step+1}단계 (${Math.pow(2,step)}유닛). ` +
+             `<b style="color:#ffce8a">경고: 연패가 이어지면 베팅액이 지수적으로 커지고, ` +
+             `테이블 상한과 뱅크롤에 먼저 막혀 큰 손실로 끝나는 전략입니다.</b>`;
+      break;
+    }
+  }
+
+  const capped = bank > 0 && amt > bank;
+  if (capped){ amt = Math.floor(bank/unit)*unit; note += ' <b style="color:#ff7b85">(뱅크롤 한도로 축소)</b>'; }
+  if (edge != null && edge <= 0 && amt > 0)
+    note += `<br><b style="color:#ffce8a">참고: 이 슈의 추정 기대우위는 ${(edge*100).toFixed(2)}%로 음수입니다.</b>`;
+  return {amt, note, edge};
+}
+
+function resetStake(){ S.bet = {step:0, idx:0}; render(); }
+
+// 결과가 나올 때마다 진행형 전략 단계 갱신
+function advanceStake(won){
+  if (won){ S.bet.step = 0; S.bet.idx = (S.bet.idx + 1) % 4; }
+  else    { S.bet.step++;   S.bet.idx = 0; }
+}
+
+/* ---------------- 패턴 라이브러리 UI ---------------- */
+function addPattern(){
+  const el = document.getElementById('patIn');
+  const pat = parsePattern(el.value);
+  if (!pat) return alert('B/P 문자열(예: BBPB) 또는 열 길이 주기(예: 1-2-1-2)를 입력하세요.');
+  if (S.custom.some(x => x.raw === pat.raw)) return alert('이미 등록된 패턴입니다.');
+  S.custom.push(pat); el.value = ''; render();
+}
+function removePattern(raw){ S.custom = S.custom.filter(p => p.raw !== raw); render(); }
+function togglePattern(raw){
+  const p = S.custom.find(x => x.raw === raw); if (p) p.off = !p.off; render();
+}
+function resetPatterns(){
+  S.custom = DEFAULT_PATTERNS.map(parsePattern).filter(Boolean); render();
+}
+
+function renderLib(a){
+  const hitKeys = new Set(a.patterns.map(p => p.key));
+  document.getElementById('lib').innerHTML = S.custom.map(p => {
+    const m = a.patterns.find(x => x.key === 'lib:'+p.raw);
+    const cls = p.off ? 'off' : (hitKeys.has('lib:'+p.raw) ? 'hit' : '');
+    const tail = m ? (m.w > 0 ? ` · ${m.side === 'B' ? '뱅커' : '플레이어'}` : ' · 보류') : '';
+    return `<span class="chip ${cls}" title="${m ? m.desc.replace(/"/g,'') : '아직 모양이 일치하지 않음'}">
+      <b onclick="togglePattern('${p.raw}')" style="cursor:pointer">${p.raw}</b>
+      <span style="opacity:.7">${p.type === 'len' ? '열' : '모양'}${tail}</span>
+      <i onclick="removePattern('${p.raw}')">✕</i></span>`;
+  }).join('') || '<span style="font-size:12px;opacity:.5">등록된 패턴이 없습니다.</span>';
+}
+
 /* ---------------- 세션 저장 / 내보내기 ---------------- */
 const msg = t => document.getElementById('sessMsg').textContent = t;
 
 function saveSession(){
   try {
-    localStorage.setItem('baccarat-bot', JSON.stringify({h:S.history, perf:S.perf, t:Date.now()}));
+    localStorage.setItem('baccarat-bot', JSON.stringify({h:S.history, perf:S.perf, custom:S.custom, t:Date.now()}));
     msg(`저장 완료 (${S.history.length}판)`);
   } catch(e){ msg('저장 실패: ' + e.message); }
 }
@@ -968,6 +1237,7 @@ function loadSession(){
     const d = JSON.parse(localStorage.getItem('baccarat-bot') || 'null');
     if (!d) return msg('저장된 기록이 없습니다.');
     S.history = d.h || []; S.perf = d.perf || {n:0,hit:0,pnl:0};
+    if (d.custom && d.custom.length) S.custom = d.custom;
     render(); msg(`불러오기 완료 (${S.history.length}판, ${new Date(d.t).toLocaleString()})`);
   } catch(e){ msg('불러오기 실패: ' + e.message); }
 }
@@ -991,12 +1261,14 @@ function importPrompt(){
   S.history = h; render(); msg(`${h.length}판을 불러왔습니다.`);
 }
 
+document.getElementById('strat').addEventListener('change', render);
 ['bank','unit','kelly'].forEach(id =>
   document.getElementById(id).addEventListener('input', () => renderMoney(S.lastAnalysis || analyze(S.history))));
 
 ['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('input', applyBox));
 window.addEventListener('resize', applyBox);
 
+S.custom = DEFAULT_PATTERNS.map(parsePattern).filter(Boolean);
 render();
 </script>
 </body>
