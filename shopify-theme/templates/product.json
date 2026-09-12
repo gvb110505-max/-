@@ -1,0 +1,25 @@
+{
+  "sections": {
+    "main": {
+      "type": "strukt-product",
+      "blocks": {
+        "s1": { "type": "spec", "settings": { "label": "Fabric", "value": "Japanese cotton canvas, 11oz" } },
+        "s2": { "type": "spec", "settings": { "label": "Made in", "value": "Seoul, Korea" } },
+        "s3": { "type": "spec", "settings": { "label": "Care", "value": "Cold wash, dry flat, press warm" } }
+      },
+      "block_order": ["s1", "s2", "s3"],
+      "settings": {
+        "back_label": "Back to catalogue",
+        "grayscale": true,
+        "show_stock_row": true
+      }
+    },
+    "newsletter": {
+      "type": "strukt-newsletter",
+      "settings": {
+        "heading": "Next run opens\nthe first Monday."
+      }
+    }
+  },
+  "order": ["main", "newsletter"]
+}

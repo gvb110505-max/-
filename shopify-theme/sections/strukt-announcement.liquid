@@ -1,0 +1,36 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+<div class="strukt">
+  <div class="strukt-announce">
+    {%- if section.settings.message != blank -%}
+      <span>{{ section.settings.message }}</span>
+    {%- endif -%}
+    {%- if section.settings.aside != blank -%}
+      <span class="strukt-announce__aside">{{ section.settings.aside }}</span>
+    {%- endif -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt announcement",
+  "tag": "section",
+  "class": "strukt-section-announcement",
+  "settings": [
+    {
+      "type": "text",
+      "id": "message",
+      "label": "Message",
+      "default": "Free shipping over ₩150,000 — 30-day returns"
+    },
+    {
+      "type": "text",
+      "id": "aside",
+      "label": "Secondary text",
+      "info": "Shown right-aligned, dimmed.",
+      "default": "Seoul · Tokyo · Berlin"
+    }
+  ],
+  "presets": [{ "name": "Strukt announcement" }]
+}
+{% endschema %}

@@ -1,0 +1,78 @@
+{
+  "sections": {
+    "hero": {
+      "type": "strukt-hero",
+      "settings": {
+        "kicker": "Autumn collection 2026",
+        "heading": "Structure first.\nNothing decorative.",
+        "body": "Four pattern pieces, twelve seams. Strukt makes garments with only what the garment needs. Every run is small, every stock count on this page is the real one.",
+        "primary_label": "Shop the collection",
+        "primary_url": "#shop",
+        "secondary_label": "How it's made",
+        "secondary_url": "#editorial",
+        "image_ratio": "4 / 5",
+        "grayscale": true
+      }
+    },
+    "promises": {
+      "type": "strukt-promises",
+      "blocks": {
+        "p1": { "type": "promise", "settings": { "number": "14", "label": "Days from cut to shipped" } },
+        "p2": { "type": "promise", "settings": { "number": "4", "label": "Pattern pieces per garment" } },
+        "p3": { "type": "promise", "settings": { "number": "100%", "label": "Mill and cost published" } },
+        "p4": { "type": "promise", "settings": { "number": "30", "label": "Day returns, no questions" } }
+      },
+      "block_order": ["p1", "p2", "p3", "p4"]
+    },
+    "catalogue": {
+      "type": "strukt-catalogue",
+      "settings": {
+        "products_to_show": 8,
+        "kicker": "New this week",
+        "heading": "The catalogue",
+        "anchor": "shop",
+        "show_filters": true,
+        "filter_all_label": "All",
+        "grayscale": true,
+        "low_stock_threshold": 3,
+        "add_label": "Add to cart",
+        "choose_label": "Choose a size",
+        "sold_out_label": "Notify me"
+      }
+    },
+    "editorial": {
+      "type": "strukt-editorial",
+      "settings": {
+        "kicker": "The workshop",
+        "heading": "Cut in Seoul, finished by hand",
+        "body": "Two cutters, one sewing floor, a fourteen-day run. We publish the fabric mill, the seam count and the unit cost of every garment — the same way we publish the price.",
+        "button_label": "Read the production notes",
+        "button_url": "#archive",
+        "anchor": "editorial",
+        "image_ratio": "951 / 665",
+        "grayscale": true
+      }
+    },
+    "archive": {
+      "type": "strukt-archive",
+      "blocks": {
+        "r1": { "type": "row", "settings": { "run": "R-018", "name": "Two-Seam Mac", "fabric": "Ventile cotton", "units": "120", "status": "Sold out" } },
+        "r2": { "type": "row", "settings": { "run": "R-017", "name": "Grid Knit Crew", "fabric": "Lambswool 3-gauge", "units": "90", "status": "Restocking" } },
+        "r3": { "type": "row", "settings": { "run": "R-015", "name": "Column Wool Coat", "fabric": "Italian melton", "units": "60", "status": "Sold out" } },
+        "r4": { "type": "row", "settings": { "run": "R-012", "name": "Set-Square Tee", "fabric": "Supima jersey", "units": "400", "status": "In stock" } }
+      },
+      "block_order": ["r1", "r2", "r3", "r4"]
+    },
+    "newsletter": {
+      "type": "strukt-newsletter",
+      "settings": {
+        "heading": "Next run opens\nthe first Monday.",
+        "label": "Get the drop notice",
+        "placeholder": "you@studio.com",
+        "button_label": "Notify me",
+        "anchor": "strukt-newsletter"
+      }
+    }
+  },
+  "order": ["hero", "promises", "catalogue", "editorial", "archive", "newsletter"]
+}

@@ -1,0 +1,46 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+<div class="strukt">
+  <div class="strukt-topline">
+    <div class="strukt-container">
+      <div class="strukt-promises">
+        {%- for block in section.blocks -%}
+          <div class="strukt-promises__item" {{ block.shopify_attributes }}>
+            <p class="strukt-promises__num">{{ block.settings.number }}</p>
+            <p class="strukt-promises__label">{{ block.settings.label }}</p>
+          </div>
+        {%- endfor -%}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt promises",
+  "tag": "section",
+  "class": "strukt-section-promises",
+  "max_blocks": 6,
+  "blocks": [
+    {
+      "type": "promise",
+      "name": "Promise",
+      "settings": [
+        { "type": "text", "id": "number", "label": "Figure", "default": "14" },
+        { "type": "text", "id": "label", "label": "Label", "default": "Days from cut to shipped" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Strukt promises",
+      "blocks": [
+        { "type": "promise", "settings": { "number": "14", "label": "Days from cut to shipped" } },
+        { "type": "promise", "settings": { "number": "4", "label": "Pattern pieces per garment" } },
+        { "type": "promise", "settings": { "number": "100%", "label": "Mill and cost published" } },
+        { "type": "promise", "settings": { "number": "30", "label": "Day returns, no questions" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

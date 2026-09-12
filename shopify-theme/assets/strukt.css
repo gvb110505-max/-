@@ -1,0 +1,391 @@
+/* ==========================================================================
+   Strukt storefront — Shopify port of the Modernist design system.
+   Every rule is scoped under .strukt so it cannot collide with the host
+   theme's own CSS. Tokens live on .strukt; the header section emits a
+   `.strukt.strukt { ... }` override block so customizer colours always win.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
+
+.strukt {
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #ec3013;
+  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+
+  --color-neutral-500: #9b9797;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  --strukt-container: 1320px;
+  --strukt-gutter: 24px;
+
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.strukt *,
+.strukt *::before,
+.strukt *::after { box-sizing: border-box; }
+
+.strukt img { display: block; max-width: 100%; }
+.strukt figure { margin: 0; }
+.strukt a { color: var(--color-text); text-decoration: none; }
+.strukt a:hover { color: var(--color-accent-700); }
+.strukt :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.strukt ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+.strukt-container {
+  max-width: var(--strukt-container);
+  margin: 0 auto;
+  padding-inline: var(--strukt-gutter);
+}
+.strukt-topline { border-top: 2px solid var(--color-divider); }
+.strukt-kicker {
+  display: block;
+  font-size: 13px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--color-accent-700);
+  margin: 0 0 20px;
+}
+.strukt-num { font-feature-settings: 'tnum' 1; }
+.strukt-media { position: relative; width: 100%; border: 2px solid var(--color-divider); overflow: hidden; }
+.strukt-media > img,
+.strukt-media > svg { width: 100%; height: 100%; object-fit: cover; }
+.strukt-media .placeholder-svg { width: 100%; height: 100%; background: var(--color-surface); fill: var(--color-neutral-500); }
+.strukt-grayscale { filter: grayscale(1) contrast(1.08); }
+
+/* — buttons ————————————————————————————————————————————————— */
+.strukt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: 800; font-size: 14px; line-height: 1.2;
+  color: var(--color-text); background: transparent;
+  border: 1px solid transparent; border-radius: 0;
+  padding: 8px 14.4px;
+}
+.strukt-btn:disabled { opacity: .45; cursor: not-allowed; }
+.strukt-btn--primary { background: var(--color-accent); color: var(--color-bg); }
+.strukt-btn--primary:hover { background: var(--color-accent-600); color: var(--color-bg); }
+.strukt-btn--primary:active { background: var(--color-accent-700); }
+.strukt-btn--secondary { border-color: var(--color-divider); }
+.strukt-btn--secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.strukt-btn--ghost { color: var(--color-accent); padding-inline: 4px; }
+.strukt-btn--ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-accent); }
+.strukt-btn--block { width: 100%; margin-top: 8px; justify-content: flex-start; text-align: left; }
+
+/* — segmented controls (filters, variant options) —————————————— */
+.strukt-seg { display: flex; flex-wrap: wrap; border: 2px solid var(--color-divider); width: max-content; max-width: 100%; }
+.strukt-seg__btn {
+  font-family: var(--font-body); font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 11px 16px; border: 0; border-left: 2px solid var(--color-divider);
+  cursor: pointer; background: var(--color-bg); color: var(--color-text);
+}
+.strukt-seg__btn:first-child { border-left: 0; }
+.strukt-seg__btn:hover { background: var(--color-accent-100); color: var(--color-accent-700); }
+.strukt-seg__btn[aria-pressed="true"],
+.strukt-seg__btn[aria-checked="true"] { background: var(--color-accent); color: #f3f2f2; font-weight: 600; }
+.strukt-seg__btn[aria-pressed="true"]:hover,
+.strukt-seg__btn[aria-checked="true"]:hover { background: var(--color-accent-600); color: #f3f2f2; }
+.strukt-seg__btn--unavailable { text-decoration: line-through; color: var(--color-neutral-500); }
+
+.strukt-input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit; font-size: 14px;
+  color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: 0;
+}
+.strukt-hr { height: 2px; border: 0; margin: 28px 0; background: var(--color-divider); }
+.strukt-tag { display: inline-flex; align-items: center; font-size: 11px; padding: 3px 10px; border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — announcement ——————————————————————————————————————————— */
+.strukt-announce {
+  background: var(--color-text); color: var(--color-bg);
+  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 10px var(--strukt-gutter);
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.strukt-announce__aside { opacity: .72; }
+
+/* — header ————————————————————————————————————————————————— */
+.strukt-header {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 24px;
+  background: var(--color-bg); border-bottom: 2px solid var(--color-divider);
+  padding: 0 var(--strukt-gutter); min-height: 66px;
+}
+.strukt-header__brand {
+  font-family: var(--font-heading); font-weight: 800; font-size: 20px;
+  letter-spacing: -.03em; margin-right: auto;
+}
+.strukt-header__brand img { max-height: 40px; width: auto; }
+.strukt-header__nav { display: flex; gap: 22px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.strukt-header__cart { min-width: 120px; }
+
+/* — hero ——————————————————————————————————————————————————— */
+.strukt-hero {
+  display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: clamp(24px, 4vw, 64px);
+  padding-block: clamp(32px, 5vw, 72px) clamp(32px, 4vw, 56px);
+  align-items: end;
+}
+.strukt-hero__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(38px, 6vw, 82px); line-height: 1.05; letter-spacing: -.025em;
+  margin: 0 0 0 -.058em;
+}
+.strukt-hero__title span { display: block; }
+.strukt-hero__body { font-size: 17px; line-height: 1.65; max-width: 52ch; margin: 28px 0 0; }
+.strukt-hero__actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+
+/* — promises strip ————————————————————————————————————————— */
+.strukt-promises { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.strukt-promises__item { padding: 28px 24px; border-left: 2px solid var(--color-divider); }
+.strukt-promises__num {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(28px, 3vw, 40px); line-height: 1.1; color: var(--color-accent);
+  margin: 0; font-feature-settings: 'tnum' 1;
+}
+.strukt-promises__label {
+  font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-neutral-700); margin: 12px 0 0; line-height: 1.4;
+}
+
+/* — catalogue ——————————————————————————————————————————————— */
+.strukt-section { padding-block: clamp(32px, 4vw, 56px); }
+.strukt-section__head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap; margin-bottom: 28px;
+}
+.strukt-section__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(26px, 3vw, 36px); letter-spacing: -.015em; margin: 0;
+}
+.strukt-section__head .strukt-kicker { margin-bottom: 12px; }
+
+.strukt-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  border-top: 2px solid var(--color-divider); border-left: 2px solid var(--color-divider);
+}
+.strukt-card {
+  border-right: 2px solid var(--color-divider); border-bottom: 2px solid var(--color-divider);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--color-bg);
+}
+.strukt-card[hidden] { display: none; }
+.strukt-card__media { display: block; aspect-ratio: 4 / 5; border: 0; }
+.strukt-card__row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.strukt-card__name { font-family: var(--font-heading); font-weight: 800; font-size: 16px; letter-spacing: -.01em; line-height: 1.25; }
+.strukt-card__price { font-size: 15px; font-feature-settings: 'tnum' 1; white-space: nowrap; }
+.strukt-card__meta {
+  display: flex; justify-content: space-between; gap: 12px; align-items: center;
+  font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-neutral-700);
+}
+.strukt-card__cta { margin-top: auto; }
+.strukt-stock--low { color: var(--color-accent-700); }
+.strukt-stock--out { color: var(--color-neutral-500); }
+.strukt-card__form { margin: 0; margin-top: auto; }
+.strukt-card__form .strukt-btn--block { margin-top: 0; }
+
+/* — editorial ——————————————————————————————————————————————— */
+.strukt-editorial {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(24px, 4vw, 72px); align-items: center;
+}
+.strukt-editorial--reverse .strukt-editorial__media { order: -1; }
+.strukt-editorial__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(24px, 2.6vw, 32px); letter-spacing: -.015em; margin: 0; line-height: 1.2;
+}
+.strukt-editorial__body { font-size: 15.5px; line-height: 1.65; color: var(--color-neutral-800); margin: 20px 0 0; max-width: 48ch; }
+.strukt-editorial .strukt-btn { margin-top: 24px; }
+
+/* — archive table ——————————————————————————————————————————— */
+.strukt-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.strukt-table th {
+  text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: 8px; border-bottom: 2px solid var(--color-divider);
+}
+.strukt-table td { padding: 8px; border-bottom: 1px solid var(--color-divider); }
+.strukt-table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.strukt-table__scroll { overflow-x: auto; }
+.strukt-table__muted { color: var(--color-neutral-700); }
+
+/* — newsletter band ————————————————————————————————————————— */
+.strukt-newsletter { background: var(--color-accent); color: var(--color-bg); border-top: 2px solid var(--color-divider); }
+.strukt-newsletter__inner {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: clamp(24px, 4vw, 64px); align-items: end;
+  padding-block: clamp(40px, 5vw, 72px);
+}
+.strukt-newsletter__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(30px, 4.2vw, 56px); line-height: 1.06; letter-spacing: -.015em;
+  margin: 0 0 0 -.058em;
+}
+.strukt-newsletter__title span { display: block; }
+.strukt-newsletter__form { display: flex; flex-direction: column; gap: 12px; }
+.strukt-newsletter__label { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.strukt-newsletter__row { display: flex; gap: 0; flex-wrap: wrap; }
+.strukt-newsletter__row .strukt-input { flex: 1 1 200px; background: var(--color-bg); border-color: var(--color-bg); }
+.strukt-newsletter__row .strukt-btn { background: var(--color-text); color: var(--color-bg); border: 2px solid var(--color-text); }
+.strukt-newsletter__note { font-size: 13px; margin: 0; min-height: 20px; }
+
+/* — footer ——————————————————————————————————————————————————— */
+.strukt-footer {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 28px; padding-block: 40px; font-size: 14px; color: var(--color-neutral-700);
+}
+.strukt-footer__brand { font-family: var(--font-heading); font-weight: 800; font-size: 18px; color: var(--color-text); margin: 0 0 10px; }
+.strukt-footer__tagline { margin: 0; line-height: 1.6; }
+.strukt-footer__col { display: flex; flex-direction: column; gap: 8px; }
+.strukt-footer__col > span { color: var(--color-text); }
+
+/* — product page ——————————————————————————————————————————— */
+.strukt-product { padding-block: 24px clamp(32px, 4vw, 56px); }
+.strukt-product__layout {
+  display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  gap: clamp(24px, 4vw, 64px); align-items: start;
+}
+.strukt-product__gallery { display: flex; flex-direction: column; gap: 12px; }
+.strukt-product__media { aspect-ratio: 4 / 5; }
+.strukt-product__thumbs { display: flex; gap: 12px; flex-wrap: wrap; }
+.strukt-product__thumb { width: 72px; aspect-ratio: 4 / 5; padding: 0; background: none; cursor: pointer; }
+.strukt-product__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: clamp(30px, 3.6vw, 46px); line-height: 1.08; letter-spacing: -.02em;
+  margin: 0 0 0 -.04em;
+}
+.strukt-product__price { font-family: var(--font-heading); font-weight: 800; font-size: 24px; font-feature-settings: 'tnum' 1; margin: 20px 0 0; }
+.strukt-product__compare { font-weight: 400; font-size: 18px; color: var(--color-neutral-700); text-decoration: line-through; margin-left: 10px; }
+.strukt-product__blurb { font-size: 15.5px; line-height: 1.65; color: var(--color-neutral-800); margin: 20px 0 0; max-width: 46ch; }
+.strukt-product__optlabel { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-700); margin: 24px 0 12px; }
+.strukt-product__optlabel:first-of-type { margin-top: 0; }
+.strukt-product__note { font-size: 13px; color: var(--color-accent-700); margin: 12px 0 0; min-height: 20px; }
+.strukt-qty { display: flex; align-items: stretch; border: 2px solid var(--color-divider); width: max-content; }
+.strukt-qty__btn { border: 0; min-width: 48px; }
+.strukt-qty__input {
+  width: 56px; text-align: center; border: 0;
+  border-left: 2px solid var(--color-divider); border-right: 2px solid var(--color-divider);
+  font: inherit; font-size: 16px; font-feature-settings: 'tnum' 1;
+  background: var(--color-bg); color: var(--color-text); -moz-appearance: textfield;
+}
+.strukt-qty__input::-webkit-outer-spin-button,
+.strukt-qty__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.strukt-product__actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+.strukt-product__actions .strukt-btn--primary { min-width: 220px; }
+.strukt-specs { display: grid; grid-template-columns: auto 1fr; gap: 10px 24px; font-size: 14px; margin: 0; }
+.strukt-specs dt { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-700); white-space: nowrap; }
+.strukt-specs dd { margin: 0; }
+
+/* — cart drawer ————————————————————————————————————————————— */
+@keyframes strukt-slidein { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes strukt-fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes strukt-risein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.strukt-drawer[hidden] { display: none; }
+.strukt-drawer__scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: color-mix(in srgb, #201e1d 48%, transparent);
+  animation: strukt-fadein .18s ease-out; border: 0; padding: 0; cursor: pointer;
+}
+.strukt-drawer__panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 70;
+  width: min(420px, 100%); background: var(--color-bg);
+  border-left: 2px solid var(--color-text);
+  display: flex; flex-direction: column;
+  animation: strukt-slidein .22s cubic-bezier(.2, .8, .2, 1);
+}
+.strukt-drawer__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 20px 24px; border-bottom: 2px solid var(--color-divider);
+}
+.strukt-drawer__title { font-family: var(--font-heading); font-weight: 800; font-size: 18px; margin: 0; }
+.strukt-drawer__body { flex: 1; overflow: auto; }
+.strukt-drawer__empty { padding: 24px; font-size: 15px; color: var(--color-neutral-700); margin: 0; }
+.strukt-line {
+  display: grid; grid-template-columns: 64px 1fr auto; gap: 14px;
+  padding: 16px 24px; border-bottom: 2px solid var(--color-divider); align-items: start;
+}
+.strukt-line__media { width: 64px; aspect-ratio: 4 / 5; }
+.strukt-line__name { font-family: var(--font-heading); font-weight: 800; font-size: 14px; margin: 0; line-height: 1.3; }
+.strukt-line__opts { font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-neutral-700); margin: 6px 0 0; }
+.strukt-line__controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.strukt-line__step {
+  font-family: var(--font-body); width: 26px; height: 26px;
+  border: 2px solid var(--color-divider); background: var(--color-bg); color: var(--color-text); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.strukt-line__step:hover { border-color: var(--color-accent); color: var(--color-accent-700); }
+.strukt-line__qty { font-size: 14px; font-feature-settings: 'tnum' 1; min-width: 14px; text-align: center; }
+.strukt-line__remove {
+  font-family: var(--font-body); margin-left: auto; font-size: 12px; letter-spacing: .07em;
+  text-transform: uppercase; background: none; border: 0; color: var(--color-accent-700); cursor: pointer; padding: 0;
+}
+.strukt-line__total { font-size: 14px; font-feature-settings: 'tnum' 1; }
+.strukt-drawer__foot {
+  border-top: 2px solid var(--color-text); padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.strukt-drawer__ship {
+  display: flex; justify-content: space-between;
+  font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-neutral-700);
+}
+.strukt-drawer__subtotal { display: flex; justify-content: space-between; align-items: baseline; }
+.strukt-drawer__subtotal span:first-child { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.strukt-drawer__subtotal span:last-child { font-family: var(--font-heading); font-weight: 800; font-size: 22px; font-feature-settings: 'tnum' 1; }
+.strukt-drawer__foot .strukt-btn--block { justify-content: center; text-align: center; }
+.strukt-drawer.is-busy .strukt-drawer__panel { opacity: .6; pointer-events: none; }
+
+.strukt-toast {
+  position: fixed; left: 24px; bottom: 24px; z-index: 80;
+  background: var(--color-text); color: var(--color-bg);
+  padding: 14px 18px; font-size: 14px; border-left: 6px solid var(--color-accent);
+  animation: strukt-risein .2s ease-out; max-width: calc(100vw - 48px);
+}
+.strukt-toast[hidden] { display: none; }
+
+.strukt-visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* — responsive ——————————————————————————————————————————————
+   The canvas artboard is desktop-only; these are the stacking rules a live
+   storefront needs. Breakpoints follow the two-column layouts above.
+   ————————————————————————————————————————————————————————— */
+@media (max-width: 899px) {
+  .strukt-hero,
+  .strukt-editorial,
+  .strukt-newsletter__inner,
+  .strukt-product__layout { grid-template-columns: minmax(0, 1fr); }
+  .strukt-hero { align-items: start; }
+  .strukt-editorial--reverse .strukt-editorial__media { order: 0; }
+  .strukt-newsletter__inner { align-items: start; }
+}
+@media (max-width: 749px) {
+  .strukt { --strukt-gutter: 16px; }
+  .strukt-header { flex-wrap: wrap; gap: 12px; padding-block: 12px; }
+  .strukt-header__nav { order: 3; width: 100%; overflow-x: auto; gap: 16px; padding-bottom: 2px; }
+  .strukt-header__cart { min-width: 0; }
+  .strukt-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .strukt-card { padding: 12px; gap: 10px; }
+  .strukt-card__row,
+  .strukt-card__meta { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .strukt-promises__item { padding: 20px 16px; }
+  .strukt-product__actions .strukt-btn--primary { min-width: 0; flex: 1 1 100%; }
+}

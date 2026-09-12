@@ -1,0 +1,65 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+{%- comment -%}
+  Doubling the class raises specificity above strukt.css, so these customizer
+  colours win no matter where the stylesheet link lands in the document.
+{%- endcomment -%}
+<style>
+  .strukt.strukt {
+    --color-bg: {{ section.settings.color_bg }};
+    --color-text: {{ section.settings.color_text }};
+    --color-accent: {{ section.settings.color_accent }};
+    --color-accent-600: {{ section.settings.color_accent | color_darken: 6 }};
+    --color-accent-700: {{ section.settings.color_accent | color_darken: 14 }};
+    --color-accent-100: {{ section.settings.color_accent | color_lighten: 44 }};
+    --color-divider: {{ section.settings.color_text | color_to_rgb | color_modify: 'alpha', 0.4 }};
+    --color-surface: {{ section.settings.color_bg | color_darken: 4 }};
+  }
+</style>
+
+<div class="strukt">
+  <header class="strukt-header">
+    <a href="{{ routes.root_url }}" class="strukt-header__brand">
+      {%- if section.settings.logo != blank -%}
+        {{ section.settings.logo | image_url: width: 400 | image_tag: alt: shop.name, widths: '100,200,400' }}
+      {%- else -%}
+        {{ section.settings.brand | default: shop.name }}
+      {%- endif -%}
+    </a>
+
+    {%- if section.settings.menu != blank -%}
+      <nav class="strukt-header__nav" aria-label="Primary">
+        {%- for link in section.settings.menu.links -%}
+          <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>{{ link.title }}</a>
+        {%- endfor -%}
+      </nav>
+    {%- endif -%}
+
+    <button
+      type="button"
+      class="strukt-btn strukt-btn--ghost strukt-header__cart"
+      data-strukt-cart-open
+    >{{ section.settings.cart_label }} — <span data-strukt-cart-count>{{ cart.item_count }}</span></button>
+  </header>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt header",
+  "tag": "section",
+  "class": "strukt-section-header",
+  "settings": [
+    { "type": "header", "content": "Brand" },
+    { "type": "text", "id": "brand", "label": "Wordmark", "default": "STRUKT" },
+    { "type": "image_picker", "id": "logo", "label": "Logo image", "info": "Replaces the wordmark when set." },
+    { "type": "link_list", "id": "menu", "label": "Menu" },
+    { "type": "text", "id": "cart_label", "label": "Cart button label", "default": "Cart" },
+    { "type": "header", "content": "Palette" },
+    { "type": "paragraph", "content": "These colours drive every Strukt section on the page." },
+    { "type": "color", "id": "color_bg", "label": "Background", "default": "#f3f2f2" },
+    { "type": "color", "id": "color_text", "label": "Text", "default": "#201e1d" },
+    { "type": "color", "id": "color_accent", "label": "Accent", "default": "#ec3013" }
+  ],
+  "presets": [{ "name": "Strukt header" }]
+}
+{% endschema %}

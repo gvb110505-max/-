@@ -1,0 +1,138 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'strukt.js' | asset_url }}" defer></script>
+
+{%- liquid
+  assign threshold = section.settings.free_shipping_threshold | times: 100
+  if cart.item_count == 0
+    assign ship_text = '—'
+  elsif threshold > 0 and cart.total_price >= threshold
+    assign ship_text = section.settings.free_shipping_label
+  else
+    assign ship_text = section.settings.shipping_label
+  endif
+-%}
+
+<div class="strukt">
+  <div class="strukt-drawer" data-strukt-drawer hidden>
+    <button
+      type="button"
+      class="strukt-drawer__scrim"
+      data-strukt-cart-close
+      aria-label="{{ section.settings.close_label }}"
+    ></button>
+
+    <aside class="strukt-drawer__panel" role="dialog" aria-modal="true" aria-label="{{ section.settings.title }}">
+      <div class="strukt-drawer__head">
+        <p class="strukt-drawer__title">
+          {{ section.settings.title }} — <span data-strukt-cart-count>{{ cart.item_count }}</span>
+        </p>
+        <button type="button" class="strukt-btn strukt-btn--ghost" data-strukt-cart-close>
+          {{ section.settings.close_label }}
+        </button>
+      </div>
+
+      <div class="strukt-drawer__body">
+        {%- if cart.item_count == 0 -%}
+          <p class="strukt-drawer__empty">{{ section.settings.empty_text }}</p>
+        {%- else -%}
+          {%- for item in cart.items -%}
+            <div class="strukt-line">
+              <a href="{{ item.url }}" class="strukt-media strukt-line__media strukt-grayscale" tabindex="-1" aria-hidden="true">
+                {%- if item.image -%}
+                  {{ item.image | image_url: width: 160 | image_tag: loading: 'lazy', widths: '64,128,160', alt: item.title }}
+                {%- else -%}
+                  {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+                {%- endif -%}
+              </a>
+
+              <div>
+                <p class="strukt-line__name">{{ item.product.title }}</p>
+                {%- unless item.variant.title contains 'Default' -%}
+                  <p class="strukt-line__opts">{{ item.variant.title }}</p>
+                {%- endunless -%}
+
+                <div class="strukt-line__controls">
+                  <button
+                    type="button"
+                    class="strukt-line__step"
+                    data-strukt-line-change="{{ item.quantity | minus: 1 }}"
+                    data-line="{{ forloop.index }}"
+                    aria-label="Decrease quantity"
+                  >–</button>
+                  <span class="strukt-line__qty">{{ item.quantity }}</span>
+                  <button
+                    type="button"
+                    class="strukt-line__step"
+                    data-strukt-line-change="{{ item.quantity | plus: 1 }}"
+                    data-line="{{ forloop.index }}"
+                    aria-label="Increase quantity"
+                  >+</button>
+                  <button
+                    type="button"
+                    class="strukt-line__remove"
+                    data-strukt-line-change="0"
+                    data-line="{{ forloop.index }}"
+                  >{{ section.settings.remove_label }}</button>
+                </div>
+              </div>
+
+              <span class="strukt-line__total">{{ item.final_line_price | money }}</span>
+            </div>
+          {%- endfor -%}
+        {%- endif -%}
+      </div>
+
+      <div class="strukt-drawer__foot">
+        <div class="strukt-drawer__ship">
+          <span>{{ section.settings.shipping_heading }}</span>
+          <span>{{ ship_text }}</span>
+        </div>
+        <div class="strukt-drawer__subtotal">
+          <span>{{ section.settings.subtotal_label }}</span>
+          <span>{{ cart.total_price | money }}</span>
+        </div>
+
+        {%- if cart.item_count > 0 -%}
+          <form action="{{ routes.cart_url }}" method="post">
+            <button type="submit" name="checkout" class="strukt-btn strukt-btn--primary strukt-btn--block">
+              {{ section.settings.checkout_label }} — {{ cart.total_price | money }}
+            </button>
+          </form>
+        {%- else -%}
+          <button type="button" class="strukt-btn strukt-btn--primary strukt-btn--block" disabled>
+            {{ section.settings.empty_button_label }}
+          </button>
+        {%- endif -%}
+      </div>
+    </aside>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt cart drawer",
+  "tag": "section",
+  "class": "strukt-section-cart-drawer",
+  "settings": [
+    { "type": "paragraph", "content": "Add this once in theme.liquid as {% section 'strukt-cart-drawer' %} so it is available on every page." },
+    { "type": "text", "id": "title", "label": "Title", "default": "Cart" },
+    { "type": "text", "id": "close_label", "label": "Close label", "default": "Close" },
+    { "type": "text", "id": "empty_text", "label": "Empty state", "default": "Nothing here yet. The catalogue is one tap away." },
+    { "type": "text", "id": "remove_label", "label": "Remove label", "default": "Remove" },
+    { "type": "text", "id": "subtotal_label", "label": "Subtotal label", "default": "Subtotal" },
+    { "type": "text", "id": "checkout_label", "label": "Checkout label", "default": "Checkout" },
+    { "type": "text", "id": "empty_button_label", "label": "Disabled checkout label", "default": "Cart is empty" },
+    { "type": "header", "content": "Shipping line" },
+    { "type": "text", "id": "shipping_heading", "label": "Row label", "default": "Shipping" },
+    {
+      "type": "number",
+      "id": "free_shipping_threshold",
+      "label": "Free shipping over",
+      "info": "In your store currency, before tax. Set 0 to always show the fallback text.",
+      "default": 150000
+    },
+    { "type": "text", "id": "free_shipping_label", "label": "Free shipping text", "default": "Free" },
+    { "type": "text", "id": "shipping_label", "label": "Fallback text", "default": "Calculated at checkout" }
+  ]
+}
+{% endschema %}

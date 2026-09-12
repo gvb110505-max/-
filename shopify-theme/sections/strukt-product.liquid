@@ -1,0 +1,247 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'strukt.js' | asset_url }}" defer></script>
+
+{%- liquid
+  assign current = product.selected_or_first_available_variant
+
+  assign tracked = false
+  assign stock = 0
+  for v in product.variants
+    if v.inventory_management != blank
+      assign tracked = true
+      if v.inventory_quantity > 0
+        assign stock = stock | plus: v.inventory_quantity
+      endif
+    endif
+  endfor
+-%}
+
+<div class="strukt">
+  <div
+    class="strukt-container strukt-product"
+    data-strukt-product
+    data-money-format="{{ shop.money_format | escape }}"
+  >
+    {%- if section.settings.back_label != blank -%}
+      <a
+        class="strukt-btn strukt-btn--ghost"
+        href="{{ section.settings.back_url | default: routes.all_products_collection_url }}"
+        style="margin-bottom:24px"
+      >{{ section.settings.back_label }}</a>
+    {%- endif -%}
+
+    <div class="strukt-product__layout">
+      <div class="strukt-product__gallery">
+        <div class="strukt-media strukt-product__media{% if section.settings.grayscale %} strukt-grayscale{% endif %}">
+          {%- if product.featured_media -%}
+            {{ product.featured_media | image_url: width: 1200 | image_tag: loading: 'eager', widths: '400,600,900,1200', sizes: '(max-width: 899px) 92vw, 48vw', alt: product.featured_media.alt | default: product.title }}
+          {%- else -%}
+            {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+          {%- endif -%}
+        </div>
+
+        {%- if product.media.size > 1 -%}
+          <div class="strukt-product__thumbs">
+            {%- for media in product.media limit: 8 -%}
+              <a
+                href="{{ media | image_url: width: 1200 }}"
+                class="strukt-media strukt-product__thumb{% if section.settings.grayscale %} strukt-grayscale{% endif %}"
+                target="_blank"
+                rel="noopener"
+                aria-label="{{ media.alt | default: product.title | escape }}"
+              >
+                {{ media | image_url: width: 160 | image_tag: loading: 'lazy', widths: '72,144,160', alt: media.alt | default: product.title }}
+              </a>
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+      </div>
+
+      <div>
+        {%- if product.type != blank -%}
+          <span class="strukt-kicker" style="margin-bottom:14px">{{ product.type }}</span>
+        {%- endif -%}
+
+        <h1 class="strukt-product__title">{{ product.title }}</h1>
+
+        <p class="strukt-product__price">
+          <span data-strukt-price>{{ current.price | money }}</span>
+          <span
+            class="strukt-product__compare"
+            data-strukt-compare
+            {% unless current.compare_at_price > current.price %}hidden{% endunless %}
+          >{% if current.compare_at_price > current.price %}{{ current.compare_at_price | money }}{% endif %}</span>
+        </p>
+
+        {%- if product.description != blank -%}
+          <div class="strukt-product__blurb">{{ product.description }}</div>
+        {%- endif -%}
+
+        {%- assign form_id = 'strukt-form-' | append: section.id -%}
+        {%- form 'product', product, class: 'strukt-js-add', id: form_id -%}
+          <input type="hidden" name="id" value="{{ current.id }}" data-strukt-variant-id>
+
+          {%- unless product.has_only_default_variant -%}
+            <hr class="strukt-hr">
+            {%- for option in product.options_with_values -%}
+              <p class="strukt-product__optlabel">{{ option.name }}</p>
+              <div
+                class="strukt-seg"
+                role="radiogroup"
+                aria-label="{{ option.name | escape }}"
+                data-strukt-option-group="{{ forloop.index }}"
+              >
+                {%- for value in option.values -%}
+                  <button
+                    type="button"
+                    class="strukt-seg__btn"
+                    role="radio"
+                    aria-checked="{% if option.selected_value == value %}true{% else %}false{% endif %}"
+                    data-strukt-option-value="{{ value | escape }}"
+                    style="min-width:56px"
+                  >{{ value }}</button>
+                {%- endfor -%}
+              </div>
+            {%- endfor -%}
+
+            <p
+              class="strukt-product__note"
+              data-strukt-note
+              data-backorder-note="{{ section.settings.backorder_note | escape }}"
+            ></p>
+          {%- endunless -%}
+
+          <p class="strukt-product__optlabel">{{ section.settings.quantity_label }}</p>
+          <div class="strukt-qty">
+            <button
+              type="button"
+              class="strukt-btn strukt-btn--ghost strukt-qty__btn"
+              data-strukt-qty-step="-1"
+              aria-label="Decrease quantity"
+            >–</button>
+            <input
+              class="strukt-qty__input"
+              type="number"
+              name="quantity"
+              value="1"
+              min="1"
+              inputmode="numeric"
+              data-strukt-qty
+              aria-label="{{ section.settings.quantity_label | escape }}"
+            >
+            <button
+              type="button"
+              class="strukt-btn strukt-btn--ghost strukt-qty__btn"
+              data-strukt-qty-step="1"
+              aria-label="Increase quantity"
+            >+</button>
+          </div>
+
+          <div class="strukt-product__actions">
+            <button
+              type="submit"
+              class="strukt-btn strukt-btn--primary"
+              data-strukt-submit
+              data-add-label="{{ section.settings.add_label | escape }}"
+              data-soldout-label="{{ section.settings.sold_out_label | escape }}"
+              data-unavailable-label="{{ section.settings.unavailable_label | escape }}"
+              {% unless current.available %}disabled{% endunless %}
+            >{% if current.available %}{{ section.settings.add_label }}{% else %}{{ section.settings.sold_out_label }}{% endif %}</button>
+
+            <button type="button" class="strukt-btn strukt-btn--ghost" data-strukt-cart-open>
+              {{ section.settings.view_cart_label }}
+            </button>
+          </div>
+        {%- endform -%}
+
+        {%- if section.blocks.size > 0 or section.settings.show_stock_row -%}
+          <hr class="strukt-hr">
+          <dl class="strukt-specs">
+            {%- for block in section.blocks -%}
+              {%- if block.settings.value != blank -%}
+                <dt {{ block.shopify_attributes }}>{{ block.settings.label }}</dt>
+                <dd>{{ block.settings.value }}</dd>
+              {%- endif -%}
+            {%- endfor -%}
+
+            {%- if section.settings.show_stock_row -%}
+              <dt>{{ section.settings.stock_label }}</dt>
+              <dd>
+                {%- if product.available == false -%}
+                  {{ section.settings.stock_sold_out }}
+                {%- elsif tracked -%}
+                  {{ section.settings.stock_units | replace: '[count]', stock }}
+                {%- else -%}
+                  {{ section.settings.stock_available }}
+                {%- endif -%}
+              </dd>
+            {%- endif -%}
+          </dl>
+        {%- endif -%}
+
+        <script type="application/json" data-strukt-variants>
+          [
+            {%- for v in product.variants -%}
+              {
+                "id": {{ v.id }},
+                "options": {{ v.options | json }},
+                "available": {{ v.available }},
+                "price": {{ v.price | money | json }},
+                "priceCents": {{ v.price }},
+                "compare": {{ v.compare_at_price | money | json }},
+                "hasCompare": {% if v.compare_at_price > v.price %}true{% else %}false{% endif %},
+                "backorder": {% if v.inventory_management != blank and v.inventory_quantity <= 0 and v.inventory_policy == 'continue' %}true{% else %}false{% endif %}
+              }{%- unless forloop.last -%},{%- endunless -%}
+            {%- endfor -%}
+          ]
+        </script>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt product",
+  "tag": "section",
+  "class": "strukt-section-product",
+  "settings": [
+    { "type": "text", "id": "back_label", "label": "Back link label", "default": "Back to catalogue" },
+    { "type": "url", "id": "back_url", "label": "Back link" },
+    { "type": "checkbox", "id": "grayscale", "label": "Grayscale photos", "default": true },
+    { "type": "header", "content": "Buying" },
+    { "type": "text", "id": "quantity_label", "label": "Quantity label", "default": "Quantity" },
+    { "type": "text", "id": "add_label", "label": "Add to cart label", "info": "The selected variant's total is appended automatically.", "default": "Add to cart" },
+    { "type": "text", "id": "sold_out_label", "label": "Sold out label", "default": "Sold out" },
+    { "type": "text", "id": "unavailable_label", "label": "Unavailable combination label", "default": "Unavailable" },
+    { "type": "text", "id": "view_cart_label", "label": "View cart label", "default": "View cart" },
+    { "type": "text", "id": "backorder_note", "label": "Backorder note", "info": "Shown when the selected variant is out of stock but still sellable.", "default": "Cut to order — ships in 14 days." },
+    { "type": "header", "content": "Stock row" },
+    { "type": "checkbox", "id": "show_stock_row", "label": "Show stock in the spec list", "default": true },
+    { "type": "text", "id": "stock_label", "label": "Row label", "default": "Stock" },
+    { "type": "text", "id": "stock_units", "label": "In stock text", "info": "[count] is replaced with the tracked inventory.", "default": "[count] units in this run" },
+    { "type": "text", "id": "stock_available", "label": "Untracked text", "default": "Made to order" },
+    { "type": "text", "id": "stock_sold_out", "label": "Sold out text", "default": "Sold out this run" }
+  ],
+  "blocks": [
+    {
+      "type": "spec",
+      "name": "Spec row",
+      "settings": [
+        { "type": "text", "id": "label", "label": "Label", "default": "Fabric" },
+        { "type": "text", "id": "value", "label": "Value", "default": "Japanese cotton canvas, 11oz" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Strukt product",
+      "blocks": [
+        { "type": "spec", "settings": { "label": "Fabric", "value": "Japanese cotton canvas, 11oz" } },
+        { "type": "spec", "settings": { "label": "Made in", "value": "Seoul, Korea" } },
+        { "type": "spec", "settings": { "label": "Care", "value": "Cold wash, dry flat, press warm" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

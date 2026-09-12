@@ -1,0 +1,97 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'strukt.js' | asset_url }}" defer></script>
+
+{%- liquid
+  assign source = section.settings.collection
+  if source == blank
+    assign source = collections.all
+  endif
+  assign products = source.products
+  assign limit = section.settings.products_to_show
+
+  assign type_str = ''
+  for p in products limit: limit
+    if p.type != blank
+      assign needle = '||' | append: p.type
+      unless type_str contains needle
+        assign type_str = type_str | append: needle
+      endunless
+    endif
+  endfor
+  assign types = type_str | split: '||'
+-%}
+
+<div class="strukt" id="{{ section.settings.anchor | default: 'shop' | handle }}">
+  <div class="strukt-topline">
+    <div class="strukt-container strukt-section">
+      <div class="strukt-section__head">
+        <div>
+          {%- if section.settings.kicker != blank -%}
+            <span class="strukt-kicker">{{ section.settings.kicker }}</span>
+          {%- endif -%}
+          <h2 class="strukt-section__title">{{ section.settings.heading }}</h2>
+        </div>
+
+        {%- if section.settings.show_filters and types.size > 1 -%}
+          <div class="strukt-seg" role="group" aria-label="Filter by product type" data-strukt-filters>
+            <button type="button" class="strukt-seg__btn" aria-pressed="true" data-strukt-filter="*">
+              {{ section.settings.filter_all_label }}
+            </button>
+            {%- for t in types -%}
+              {%- unless t == blank -%}
+                <button type="button" class="strukt-seg__btn" aria-pressed="false" data-strukt-filter="{{ t | escape }}">
+                  {{ t }}
+                </button>
+              {%- endunless -%}
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+      </div>
+
+      {%- if products.size > 0 -%}
+        <div class="strukt-grid" data-strukt-grid>
+          {%- for product in products limit: limit -%}
+            {%- render 'strukt-product-card',
+              product: product,
+              grayscale: section.settings.grayscale,
+              low_threshold: section.settings.low_stock_threshold,
+              choose_label: section.settings.choose_label,
+              sold_out_label: section.settings.sold_out_label,
+              sold_out_url: section.settings.sold_out_url,
+              add_label: section.settings.add_label
+            -%}
+          {%- endfor -%}
+        </div>
+      {%- else -%}
+        <p>{{ section.settings.empty_text }}</p>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt catalogue",
+  "tag": "section",
+  "class": "strukt-section-catalogue",
+  "settings": [
+    { "type": "collection", "id": "collection", "label": "Collection", "info": "Leave empty to show all products." },
+    { "type": "range", "id": "products_to_show", "label": "Products to show", "min": 2, "max": 24, "step": 1, "default": 8 },
+    { "type": "text", "id": "kicker", "label": "Kicker", "default": "New this week" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "The catalogue" },
+    { "type": "text", "id": "anchor", "label": "Anchor id", "info": "Used by in-page links such as #shop.", "default": "shop" },
+    { "type": "header", "content": "Filters" },
+    { "type": "checkbox", "id": "show_filters", "label": "Filter by product type", "default": true },
+    { "type": "text", "id": "filter_all_label", "label": "\"All\" label", "default": "All" },
+    { "type": "header", "content": "Cards" },
+    { "type": "checkbox", "id": "grayscale", "label": "Grayscale photos", "default": true },
+    { "type": "range", "id": "low_stock_threshold", "label": "Low stock threshold", "min": 1, "max": 20, "step": 1, "default": 3 },
+    { "type": "text", "id": "add_label", "label": "Add to cart label", "default": "Add to cart" },
+    { "type": "text", "id": "choose_label", "label": "Multi-option label", "info": "Products with sizes or colours link to their page instead of quick-adding.", "default": "Choose a size" },
+    { "type": "text", "id": "sold_out_label", "label": "Sold out label", "default": "Notify me" },
+    { "type": "url", "id": "sold_out_url", "label": "Sold out link" },
+    { "type": "text", "id": "empty_text", "label": "Empty collection text", "default": "No products in this collection yet." }
+  ],
+  "presets": [{ "name": "Strukt catalogue" }]
+}
+{% endschema %}

@@ -1,0 +1,83 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+<div class="strukt" id="{{ section.settings.anchor | default: 'archive' | handle }}">
+  <div class="strukt-topline">
+    <div class="strukt-container strukt-section">
+      {%- if section.settings.kicker != blank -%}
+        <span class="strukt-kicker">{{ section.settings.kicker }}</span>
+      {%- endif -%}
+
+      <div class="strukt-table__scroll">
+        <table class="strukt-table">
+          <thead>
+            <tr>
+              <th>{{ section.settings.col_1 }}</th>
+              <th>{{ section.settings.col_2 }}</th>
+              <th>{{ section.settings.col_3 }}</th>
+              <th>{{ section.settings.col_4 }}</th>
+              <th>{{ section.settings.col_5 }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {%- for block in section.blocks -%}
+              <tr {{ block.shopify_attributes }}>
+                <td class="strukt-num">{{ block.settings.run }}</td>
+                <td>{{ block.settings.name }}</td>
+                <td class="strukt-table__muted">{{ block.settings.fabric }}</td>
+                <td class="strukt-num">{{ block.settings.units }}</td>
+                <td>
+                  {%- if block.settings.status != blank -%}
+                    <span class="strukt-tag">{{ block.settings.status }}</span>
+                  {%- endif -%}
+                </td>
+              </tr>
+            {%- endfor -%}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt archive",
+  "tag": "section",
+  "class": "strukt-section-archive",
+  "max_blocks": 20,
+  "settings": [
+    { "type": "text", "id": "kicker", "label": "Kicker", "default": "Archive — past runs" },
+    { "type": "text", "id": "anchor", "label": "Anchor id", "default": "archive" },
+    { "type": "header", "content": "Column headings" },
+    { "type": "text", "id": "col_1", "label": "Column 1", "default": "Run" },
+    { "type": "text", "id": "col_2", "label": "Column 2", "default": "Garment" },
+    { "type": "text", "id": "col_3", "label": "Column 3", "default": "Fabric" },
+    { "type": "text", "id": "col_4", "label": "Column 4", "default": "Units" },
+    { "type": "text", "id": "col_5", "label": "Column 5", "default": "Status" }
+  ],
+  "blocks": [
+    {
+      "type": "row",
+      "name": "Run",
+      "settings": [
+        { "type": "text", "id": "run", "label": "Run", "default": "R-018" },
+        { "type": "text", "id": "name", "label": "Garment", "default": "Two-Seam Mac" },
+        { "type": "text", "id": "fabric", "label": "Fabric", "default": "Ventile cotton" },
+        { "type": "text", "id": "units", "label": "Units", "default": "120" },
+        { "type": "text", "id": "status", "label": "Status", "default": "Sold out" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Strukt archive",
+      "blocks": [
+        { "type": "row", "settings": { "run": "R-018", "name": "Two-Seam Mac", "fabric": "Ventile cotton", "units": "120", "status": "Sold out" } },
+        { "type": "row", "settings": { "run": "R-017", "name": "Grid Knit Crew", "fabric": "Lambswool 3-gauge", "units": "90", "status": "Restocking" } },
+        { "type": "row", "settings": { "run": "R-015", "name": "Column Wool Coat", "fabric": "Italian melton", "units": "60", "status": "Sold out" } },
+        { "type": "row", "settings": { "run": "R-012", "name": "Set-Square Tee", "fabric": "Supima jersey", "units": "400", "status": "In stock" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,91 @@
+{%- comment -%}
+  Renders one catalogue card.
+
+  Accepts:
+  - product          {Product}  required
+  - grayscale        {Boolean}  apply the grayscale photo treatment
+  - low_threshold    {Number}   at or below this count the card reads "Only N left"
+  - choose_label     {String}   CTA for products with more than one variant
+  - sold_out_label   {String}   CTA when nothing is in stock
+  - sold_out_url     {String}   where the sold-out CTA points
+  - add_label        {String}   CTA for single-variant quick add
+{%- endcomment -%}
+
+{%- liquid
+  assign low_threshold = low_threshold | default: 3
+  assign tracked = false
+  assign stock = 0
+  for v in product.variants
+    if v.inventory_management != blank
+      assign tracked = true
+      if v.inventory_quantity > 0
+        assign stock = stock | plus: v.inventory_quantity
+      endif
+    endif
+  endfor
+
+  if product.available == false
+    assign stock_text = 'Sold out'
+    assign stock_class = 'strukt-stock--out'
+  elsif tracked and stock <= low_threshold
+    assign stock_text = 'Only ' | append: stock | append: ' left'
+    assign stock_class = 'strukt-stock--low'
+  else
+    assign stock_text = 'In stock'
+    assign stock_class = ''
+  endif
+-%}
+
+<article class="strukt-card" data-strukt-type="{{ product.type | escape }}">
+  <a
+    href="{{ product.url }}"
+    class="strukt-media strukt-card__media{% if grayscale %} strukt-grayscale{% endif %}"
+    tabindex="-1"
+    aria-hidden="true"
+  >
+    {%- if product.featured_media -%}
+      {{ product.featured_media | image_url: width: 700 | image_tag: loading: 'lazy', widths: '250,350,500,700', sizes: '(max-width: 749px) 45vw, 24vw', alt: product.featured_media.alt | default: product.title }}
+    {%- else -%}
+      {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+    {%- endif -%}
+  </a>
+
+  <div class="strukt-card__row">
+    <a href="{{ product.url }}" class="strukt-card__name">{{ product.title }}</a>
+    <span class="strukt-card__price">
+      {%- if product.price_varies -%}
+        {{ product.price_min | money }}+
+      {%- else -%}
+        {{ product.price | money }}
+      {%- endif -%}
+    </span>
+  </div>
+
+  <div class="strukt-card__meta">
+    <span>{{ product.type | default: product.vendor }}</span>
+    <span class="{{ stock_class }}">{{ stock_text }}</span>
+  </div>
+
+  {%- if product.available == false -%}
+    <a
+      class="strukt-btn strukt-btn--secondary strukt-btn--block strukt-card__cta"
+      href="{{ sold_out_url | default: '#strukt-newsletter' }}"
+    >{{ sold_out_label | default: 'Notify me' }}</a>
+
+  {%- elsif product.variants.size > 1 -%}
+    <a
+      class="strukt-btn strukt-btn--secondary strukt-btn--block strukt-card__cta"
+      href="{{ product.url }}"
+    >{{ choose_label | default: 'Choose an option' }}</a>
+
+  {%- else -%}
+    {%- assign variant = product.selected_or_first_available_variant -%}
+    {%- form 'product', product, class: 'strukt-card__form strukt-js-add' -%}
+      <input type="hidden" name="id" value="{{ variant.id }}">
+      <input type="hidden" name="quantity" value="1">
+      <button type="submit" class="strukt-btn strukt-btn--secondary strukt-btn--block">
+        {{ add_label | default: 'Add to cart' }}
+      </button>
+    {%- endform -%}
+  {%- endif -%}
+</article>

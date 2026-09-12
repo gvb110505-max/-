@@ -1,0 +1,86 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+<div class="strukt">
+  <div class="strukt-container">
+    <section class="strukt-hero">
+      <div>
+        {%- if section.settings.kicker != blank -%}
+          <span class="strukt-kicker">{{ section.settings.kicker }}</span>
+        {%- endif -%}
+        <h1 class="strukt-hero__title">
+          {%- assign title_lines = section.settings.heading | newline_to_br | split: '<br />' -%}
+          {%- for line in title_lines -%}
+            <span>{{ line | strip }}</span>
+          {%- endfor -%}
+        </h1>
+        {%- if section.settings.body != blank -%}
+          <p class="strukt-hero__body">{{ section.settings.body }}</p>
+        {%- endif -%}
+        <div class="strukt-hero__actions">
+          {%- if section.settings.primary_label != blank -%}
+            <a class="strukt-btn strukt-btn--primary" href="{{ section.settings.primary_url | default: '#' }}">{{ section.settings.primary_label }}</a>
+          {%- endif -%}
+          {%- if section.settings.secondary_label != blank -%}
+            <a class="strukt-btn strukt-btn--ghost" href="{{ section.settings.secondary_url | default: '#' }}">{{ section.settings.secondary_label }}</a>
+          {%- endif -%}
+        </div>
+      </div>
+
+      <div
+        class="strukt-media{% if section.settings.grayscale %} strukt-grayscale{% endif %}"
+        style="aspect-ratio: {{ section.settings.image_ratio }};"
+      >
+        {%- if section.settings.image != blank -%}
+          {{ section.settings.image | image_url: width: 1200 | image_tag: loading: 'eager', widths: '400,600,900,1200', sizes: '(max-width: 899px) 92vw, 40vw' }}
+        {%- else -%}
+          {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder-svg' }}
+        {%- endif -%}
+      </div>
+    </section>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt hero",
+  "tag": "section",
+  "class": "strukt-section-hero",
+  "settings": [
+    { "type": "text", "id": "kicker", "label": "Kicker", "default": "Autumn collection 2026" },
+    {
+      "type": "textarea",
+      "id": "heading",
+      "label": "Heading",
+      "info": "Each line becomes its own display line.",
+      "default": "Structure first.\nNothing decorative."
+    },
+    {
+      "type": "textarea",
+      "id": "body",
+      "label": "Body",
+      "default": "Four pattern pieces, twelve seams. Strukt makes garments with only what the garment needs. Every run is small, every stock count on this page is the real one."
+    },
+    { "type": "header", "content": "Buttons" },
+    { "type": "text", "id": "primary_label", "label": "Primary label", "default": "Shop the collection" },
+    { "type": "url", "id": "primary_url", "label": "Primary link" },
+    { "type": "text", "id": "secondary_label", "label": "Secondary label", "default": "How it's made" },
+    { "type": "url", "id": "secondary_url", "label": "Secondary link" },
+    { "type": "header", "content": "Image" },
+    { "type": "image_picker", "id": "image", "label": "Hero image" },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Aspect ratio",
+      "options": [
+        { "value": "4 / 5", "label": "Portrait 4:5" },
+        { "value": "1 / 1", "label": "Square" },
+        { "value": "3 / 4", "label": "Portrait 3:4" },
+        { "value": "16 / 9", "label": "Landscape 16:9" }
+      ],
+      "default": "4 / 5"
+    },
+    { "type": "checkbox", "id": "grayscale", "label": "Grayscale treatment", "default": true }
+  ],
+  "presets": [{ "name": "Strukt hero" }]
+}
+{% endschema %}

@@ -1,0 +1,63 @@
+{{ 'strukt.css' | asset_url | stylesheet_tag }}
+
+<div class="strukt" id="{{ section.settings.anchor | default: 'strukt-newsletter' | handle }}">
+  <section class="strukt-newsletter">
+    <div class="strukt-container strukt-newsletter__inner">
+      <h2 class="strukt-newsletter__title">
+        {%- assign title_lines = section.settings.heading | newline_to_br | split: '<br />' -%}
+        {%- for line in title_lines -%}
+          <span>{{ line | strip }}</span>
+        {%- endfor -%}
+      </h2>
+
+      {%- form 'customer', class: 'strukt-newsletter__form' -%}
+        <input type="hidden" name="contact[tags]" value="newsletter">
+        <label class="strukt-newsletter__label" for="strukt-email-{{ section.id }}">
+          {{ section.settings.label }}
+        </label>
+        <div class="strukt-newsletter__row">
+          <input
+            id="strukt-email-{{ section.id }}"
+            class="strukt-input"
+            type="email"
+            name="contact[email]"
+            autocomplete="email"
+            placeholder="{{ section.settings.placeholder }}"
+            required
+          >
+          <button type="submit" class="strukt-btn">{{ section.settings.button_label }}</button>
+        </div>
+        <p class="strukt-newsletter__note">
+          {%- if form.posted_successfully? -%}
+            {{ section.settings.success_note }}
+          {%- elsif form.errors -%}
+            {{ form.errors | default_errors }}
+          {%- endif -%}
+        </p>
+      {%- endform -%}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{
+  "name": "Strukt newsletter",
+  "tag": "section",
+  "class": "strukt-section-newsletter",
+  "settings": [
+    {
+      "type": "textarea",
+      "id": "heading",
+      "label": "Heading",
+      "info": "Each line becomes its own display line.",
+      "default": "Next run opens\nthe first Monday."
+    },
+    { "type": "text", "id": "label", "label": "Field label", "default": "Get the drop notice" },
+    { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "you@studio.com" },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "Notify me" },
+    { "type": "text", "id": "success_note", "label": "Success message", "default": "Thanks — you are on the list for the next run." },
+    { "type": "text", "id": "anchor", "label": "Anchor id", "default": "strukt-newsletter" }
+  ],
+  "presets": [{ "name": "Strukt newsletter" }]
+}
+{% endschema %}
