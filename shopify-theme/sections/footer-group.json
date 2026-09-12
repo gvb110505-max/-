@@ -1,0 +1,40 @@
+{
+  "type": "footer",
+  "name": "Footer",
+  "sections": {
+    "strukt-footer": {
+      "type": "strukt-footer",
+      "blocks": {
+        "brand": {
+          "type": "brand",
+          "settings": {
+            "brand": "STRUKT",
+            "tagline": "Small-run garments, published openly. Seoul, since 2019."
+          }
+        },
+        "shop": { "type": "menu", "settings": { "heading": "Shop", "menu": "main-menu" } },
+        "help": { "type": "menu", "settings": { "heading": "Help", "menu": "footer" } },
+        "studio": { "type": "menu", "settings": { "heading": "Studio" } }
+      },
+      "block_order": ["brand", "shop", "help", "studio"],
+      "settings": {}
+    },
+    "strukt-cart-drawer": {
+      "type": "strukt-cart-drawer",
+      "settings": {
+        "title": "Cart",
+        "close_label": "Close",
+        "empty_text": "Nothing here yet. The catalogue is one tap away.",
+        "remove_label": "Remove",
+        "subtotal_label": "Subtotal",
+        "checkout_label": "Checkout",
+        "empty_button_label": "Cart is empty",
+        "shipping_heading": "Shipping",
+        "free_shipping_threshold": 150000,
+        "free_shipping_label": "Free",
+        "shipping_label": "Calculated at checkout"
+      }
+    }
+  },
+  "order": ["strukt-footer", "strukt-cart-drawer"]
+}

@@ -1,0 +1,25 @@
+{
+  "type": "header",
+  "name": "Header",
+  "sections": {
+    "strukt-announcement": {
+      "type": "strukt-announcement",
+      "settings": {
+        "message": "Free shipping over ₩150,000 — 30-day returns",
+        "aside": "Seoul · Tokyo · Berlin"
+      }
+    },
+    "strukt-header": {
+      "type": "strukt-header",
+      "settings": {
+        "brand": "STRUKT",
+        "menu": "main-menu",
+        "cart_label": "Cart",
+        "color_bg": "#f3f2f2",
+        "color_text": "#201e1d",
+        "color_accent": "#ec3013"
+      }
+    }
+  },
+  "order": ["strukt-announcement", "strukt-header"]
+}
