@@ -64,6 +64,35 @@
         </div>
       {%- else -%}
         <p>{{ section.settings.empty_text }}</p>
+
+        {%- comment -%}
+          Editor-only diagnosis. An empty catalogue is almost always a store
+          setting, not a theme bug, so say which one rather than leaving the
+          merchant to guess. request.design_mode is true only inside the theme
+          editor, so a shopper never sees any of this.
+        {%- endcomment -%}
+        {%- if request.design_mode -%}
+          {%- assign store_count = collections.all.all_products_count -%}
+          <div class="strukt-diagnosis">
+            <p class="strukt-diagnosis__title">Why this is empty — visible to you in the theme editor only</p>
+            <ul>
+              {%- if section.settings.collection != blank -%}
+                <li>Source: collection &ldquo;{{ section.settings.collection.title }}&rdquo; — {{ source.all_products_count }} product(s) in it</li>
+              {%- else -%}
+                <li>Source: all products — {{ store_count }} published to the Online Store</li>
+              {%- endif -%}
+              <li>Products to show: {{ limit }}</li>
+            </ul>
+
+            {%- if store_count == 0 -%}
+              <p>No product is published to the Online Store sales channel yet. Open a product in the admin, find <strong>Publishing</strong> (or <strong>Sales channels</strong>) and tick <strong>Online Store</strong>. Draft products never appear either — set the product to <strong>Active</strong>.</p>
+            {%- elsif section.settings.collection != blank and source.all_products_count == 0 -%}
+              <p>That collection holds no products, but the store has {{ store_count }} on the Online Store. Either clear the <strong>Collection</strong> setting on this section to show them all, or add the products to that collection in the admin.</p>
+            {%- else -%}
+              <p>The store has {{ store_count }} product(s) on the Online Store. If none reach this grid, check that this section's <strong>Collection</strong> setting points where you expect.</p>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
       {%- endif -%}
     </div>
   </div>

@@ -218,6 +218,23 @@
 .strukt-card__form { margin: 0; margin-top: auto; }
 .strukt-card__form .strukt-btn--block { margin-top: 0; }
 
+.strukt-diagnosis {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border-left: 6px solid var(--color-accent);
+  background: var(--color-surface);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 70ch;
+}
+.strukt-diagnosis__title {
+  font-family: var(--font-heading); font-weight: 800;
+  font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+  margin: 0 0 10px;
+}
+.strukt-diagnosis ul { margin: 0 0 12px; padding-left: 18px; }
+.strukt-diagnosis p:last-child { margin: 0; }
+
 /* — editorial ——————————————————————————————————————————————— */
 .strukt-editorial {
   display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
