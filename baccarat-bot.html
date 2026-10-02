@@ -2,11 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e1220">
 <title>바카라 화면 분석 봇</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0e1220;color:#e8ecf7;font-family:'Segoe UI','Malgun Gothic',sans-serif;padding:18px}
+  body{background:#0e1220;color:#e8ecf7;font-family:'Segoe UI','Malgun Gothic',sans-serif;padding:18px;
+       -webkit-text-size-adjust:100%;overscroll-behavior-y:contain}
   .wrap{max-width:1180px;margin:0 auto}
   h1{font-size:22px;margin-bottom:4px}
   .sub{font-size:13px;opacity:.65;margin-bottom:14px}
@@ -16,7 +18,9 @@
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
   .panel{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;margin-bottom:14px}
   .panel h2{font-size:14px;letter-spacing:.5px;opacity:.85;margin-bottom:10px;text-transform:uppercase}
-  button{background:#2b6cf6;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;margin:0 6px 6px 0}
+  button{background:#2b6cf6;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;
+       margin:0 6px 6px 0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  button:active{transform:scale(.96)}
   button:hover{background:#3b7bff}
   button.ghost{background:rgba(255,255,255,.1)}
   button.ghost:hover{background:rgba(255,255,255,.18)}
@@ -26,7 +30,8 @@
   input[type=number]{width:60px;background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.2);
         border-radius:6px;padding:4px 6px;font-size:12px;margin-right:10px}
   #stage{position:relative;display:inline-block;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
-  #video{display:block;max-width:100%;max-height:340px}
+  #video,#shot{display:block;max-width:100%;max-height:340px;touch-action:none}
+  #shot{display:none}
   #sel{position:absolute;border:2px solid #45e08a;background:rgba(69,224,138,.10);display:none;
         cursor:move;touch-action:none;box-shadow:0 0 0 9999px rgba(0,0,0,.35)}
   #sel .h{position:absolute;width:16px;height:16px;background:#45e08a;border:2px solid #0e1220;
@@ -87,6 +92,45 @@
   .roadlbl{font-size:11px;opacity:.6;margin-bottom:4px}
   .seq{font-family:monospace;font-size:12px;line-height:1.9;word-break:break-all;opacity:.85}
   a.back{color:#8fb4ff;font-size:12px;text-decoration:none}
+
+  /* ---- 터치 기기: 손잡이 키우기 ---- */
+  @media (pointer:coarse){
+    #sel{border-width:3px}
+    #sel .h{width:26px;height:26px;border-radius:50%}
+    #sel .h.nw{left:-14px;top:-14px} #sel .h.ne{right:-14px;top:-14px}
+    #sel .h.sw{left:-14px;bottom:-14px} #sel .h.se{right:-14px;bottom:-14px}
+    #sel .h.n{left:calc(50% - 13px);top:-14px} #sel .h.s{left:calc(50% - 13px);bottom:-14px}
+    #sel .h.w{left:-14px;top:calc(50% - 13px)} #sel .h.e{right:-14px;top:calc(50% - 13px)}
+    button{padding:11px 16px;font-size:14px}
+    input[type=number],select,input[type=text]{font-size:16px;padding:8px}   /* iOS 자동 확대 방지 */
+  }
+
+  /* ---- 모바일 레이아웃 ---- */
+  @media (max-width:700px){
+    body{padding:12px 12px calc(84px + env(safe-area-inset-bottom))}
+    h1{font-size:19px}
+    .panel{padding:12px;border-radius:10px}
+    .warn{font-size:12px;padding:10px 12px}
+    .cell{width:14px;height:14px;line-height:14px;font-size:8px}
+    .rec .pick{font-size:30px}
+    .betline .amt{font-size:23px}
+    table{font-size:12px} td,th{padding:5px 4px}
+    #ptable{font-size:11px}
+    .roads{-webkit-overflow-scrolling:touch}
+    .pit{flex-wrap:wrap}
+    .pit .wt{margin-left:0;width:100%;text-align:right}
+  }
+
+  /* ---- 모바일 하단 고정 입력 바 ---- */
+  #quick{position:fixed;left:0;right:0;bottom:0;display:none;gap:6px;padding:8px 10px;
+        padding-bottom:calc(8px + env(safe-area-inset-bottom));
+        background:rgba(14,18,32,.96);border-top:1px solid rgba(255,255,255,.14);
+        backdrop-filter:blur(8px);z-index:50}
+  #quick button{flex:1;margin:0;padding:14px 0;font-size:15px;font-weight:700;border-radius:10px}
+  #quick .mini{flex:0 0 58px;font-size:13px;font-weight:400}
+  #quick .nowbet{position:absolute;top:-26px;right:10px;background:rgba(43,108,246,.9);
+        font-size:11px;padding:3px 9px;border-radius:9px}
+  @media (max-width:700px){ #quick{display:flex} }
 </style>
 </head>
 <body>
@@ -108,6 +152,8 @@
       <div class="panel">
         <h2>1. 화면 공유 & 영역 지정</h2>
         <button id="btnShare">화면 공유 시작</button>
+        <button id="btnPhoto" class="ghost">📷 사진으로 판독</button>
+        <input type="file" id="fileIn" accept="image/*" style="display:none">
         <button id="btnStop" class="ghost" disabled>중지</button>
         <button id="btnBox" class="ghost" disabled>영역 상자 만들기</button>
         <button id="btnScan" class="ghost" disabled>자동 판독 시작</button>
@@ -118,6 +164,7 @@
         </div>
         <div id="stage">
           <video id="video" autoplay muted playsinline></video>
+          <img id="shot" alt="">
           <canvas id="gridOverlay"></canvas>
           <div id="sel">
             <div class="lbl" id="selLbl"></div>
@@ -127,6 +174,7 @@
             <div class="h sw" data-d="sw"></div><div class="h w" data-d="w"></div>
           </div>
         </div>
+        <div class="hint" id="shareHint" style="color:#ffce8a"></div>
         <div class="hint">
           <b>영역 상자 만들기</b>를 누르면 초록 상자가 나타납니다.
           상자 <b>안쪽을 끌면 이동</b>, <b>모서리·변의 네모 손잡이를 끌면 크기 조절</b>입니다.
@@ -246,6 +294,14 @@
   </div>
 </div>
 
+<div id="quick">
+  <span class="nowbet" id="qBet"></span>
+  <button class="b" onclick="manual('B')">B 뱅커</button>
+  <button class="p" onclick="manual('P')">P 플레이어</button>
+  <button class="t" onclick="manual('T')">T</button>
+  <button class="ghost mini" onclick="undo()">↩</button>
+</div>
+
 <script>
 /* ---------------- 상태 ---------------- */
 const S = {
@@ -256,6 +312,7 @@ const S = {
   pendingRec: null,     // 직전 추천 (성적 추적용)
   custom: [],           // 사용자 패턴 라이브러리
   bet: {step:0, idx:0}, // 진행형 베팅 전략 단계
+  src: 'video',         // 'video' = 화면 공유, 'img' = 사진
   perf: {n:0, hit:0, pnl:0}
 };
 
@@ -263,11 +320,34 @@ const S = {
 const video = document.getElementById('video');
 const overlay = document.getElementById('gridOverlay');
 const selBox = document.getElementById('sel');
+const shot = document.getElementById('shot');
 const work = document.createElement('canvas');
+const stage = document.getElementById('stage');
+
+/* 화면 공유 영상과 사진을 같은 방식으로 다룬다 */
+const srcEl   = () => S.src === 'img' ? shot : video;
+const srcDims = () => S.src === 'img'
+  ? {w: shot.naturalWidth, h: shot.naturalHeight}
+  : {w: video.videoWidth,  h: video.videoHeight};
+const srcReady = () => srcDims().w > 0;
+
+const canShare = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+if (!canShare){
+  document.getElementById('btnShare').disabled = true;
+  document.getElementById('shareHint').innerHTML =
+    '이 기기(대부분의 모바일 브라우저)는 <b>화면 공유를 지원하지 않습니다</b>. ' +
+    '<b>📷 사진으로 판독</b>으로 로드맵을 촬영하거나 캡처 이미지를 불러오세요. ' +
+    '아래 고정 바의 <b>B / P / T</b> 버튼으로 직접 입력해도 됩니다.';
+} else if (matchMedia('(pointer:coarse)').matches){
+  document.getElementById('shareHint').innerHTML =
+    '터치 기기에서는 화면 공유가 막히는 경우가 많습니다. 안 되면 <b>📷 사진으로 판독</b>으로 ' +
+    '로드맵을 촬영하거나, 아래 고정 바의 <b>B / P / T</b> 버튼으로 직접 입력하세요.';
+}
 
 document.getElementById('btnShare').onclick = async () => {
   try {
     S.stream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5}, audio:false});
+    S.src = 'video'; video.style.display = 'block'; shot.style.display = 'none';
     video.srcObject = S.stream;
     S.stream.getVideoTracks()[0].addEventListener('ended', stopShare);
     document.getElementById('btnStop').disabled = false;
@@ -275,6 +355,27 @@ document.getElementById('btnShare').onclick = async () => {
     document.getElementById('btnBox').disabled = false;
   } catch(e) { alert('화면 공유를 시작하지 못했습니다: ' + e.message); }
 };
+/* 사진 / 캡처 이미지로 판독 */
+document.getElementById('btnPhoto').onclick = () => document.getElementById('fileIn').click();
+document.getElementById('fileIn').onchange = e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  shot.onload = () => {
+    URL.revokeObjectURL(url);
+    S.src = 'img';
+    shot.style.display = 'block'; video.style.display = 'none';
+    ['btnBox','btnScan'].forEach(id => document.getElementById(id).disabled = false);
+    document.getElementById('btnScan').textContent = '이 사진 판독';
+    // 이미지 전체를 기본 영역으로 잡아두고 바로 한 번 읽는다
+    const r = srcEl().getBoundingClientRect();
+    box = {x:r.width*0.02, y:r.height*0.02, w:r.width*0.96, h:r.height*0.96};
+    applyBox(); scanFrame();
+  };
+  shot.src = url;
+  e.target.value = '';
+};
+
 document.getElementById('btnStop').onclick = stopShare;
 function stopShare(){
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
@@ -291,7 +392,7 @@ const selLbl = document.getElementById('selLbl');
 let box = null;            // {x,y,w,h} — 화면 표시 좌표 (video 좌상단 기준)
 let act = null;            // 진행 중인 조작
 
-function videoRect(){ return video.getBoundingClientRect(); }
+function videoRect(){ return srcEl().getBoundingClientRect(); }
 
 function applyBox(){
   if (!box) { selBox.style.display='none'; S.region=null; return; }
@@ -303,7 +404,8 @@ function applyBox(){
   box.y = Math.max(0, Math.min(box.y, r.height - box.h));
   Object.assign(selBox.style, {display:'block', left:box.x+'px', top:box.y+'px',
                                width:box.w+'px', height:box.h+'px'});
-  const sx = video.videoWidth / r.width, sy = video.videoHeight / r.height;
+  const d = srcDims();
+  const sx = d.w / r.width, sy = d.h / r.height;
   S.region = {x:box.x*sx, y:box.y*sy, w:box.w*sx, h:box.h*sy};
   const rows = +document.getElementById('rows').value, cols = +document.getElementById('cols').value;
   selLbl.textContent = `${Math.round(box.w)}×${Math.round(box.h)}px · ${cols}열 ${rows}행`;
@@ -357,22 +459,27 @@ selBox.addEventListener('keydown', e => {
   applyBox();
 });
 
-// 영상 위 드래그로 한 번에 그리기 (기존 방식도 유지)
+// 미리보기 위 드래그로 한 번에 그리기 (마우스 / 터치 공통)
 let drag = null;
-video.addEventListener('pointerdown', e => {
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('#sel')) return;          // 상자 조작은 상자가 처리
+  if (!srcReady()) return;
+  e.preventDefault();
   const r = videoRect();
   drag = {x:e.clientX-r.left, y:e.clientY-r.top};
-  video.setPointerCapture(e.pointerId);
+  stage.setPointerCapture(e.pointerId);
 });
-video.addEventListener('pointermove', e => {
+stage.addEventListener('pointermove', e => {
   if (!drag) return;
+  e.preventDefault();
   const r = videoRect();
   const x2 = e.clientX-r.left, y2 = e.clientY-r.top;
   box = {x:Math.min(drag.x,x2), y:Math.min(drag.y,y2),
          w:Math.max(24,Math.abs(x2-drag.x)), h:Math.max(24,Math.abs(y2-drag.y))};
   applyBox();
 });
-video.addEventListener('pointerup', () => { drag = null; });
+stage.addEventListener('pointerup',     () => { drag = null; });
+stage.addEventListener('pointercancel', () => { drag = null; });
 
 function drawOverlay(x,y,w,h){
   const r = video.getBoundingClientRect();
@@ -390,16 +497,17 @@ function drawOverlay(x,y,w,h){
 document.getElementById('btnScan').onclick = function(){
   if (S.timer) { clearInterval(S.timer); S.timer=null; this.textContent='자동 판독 시작'; return; }
   if (!S.region) { alert('먼저 [영역 상자 만들기]로 상자를 띄우고 로드맵에 맞춰 주세요.'); return; }
+  if (S.src === 'img') { S.lastRead = null; S.stableCount = 0; scanFrame(); scanFrame(); return; }
   this.textContent='자동 판독 중지';
   S.timer = setInterval(scanFrame, Math.max(300, +document.getElementById('period').value));
 };
 
 function scanFrame(){
-  if (!S.region || !video.videoWidth) return;
+  if (!S.region || !srcReady()) return;
   const rows = +document.getElementById('rows').value, cols = +document.getElementById('cols').value;
   work.width = S.region.w; work.height = S.region.h;
   const ctx = work.getContext('2d', {willReadFrequently:true});
-  ctx.drawImage(video, S.region.x, S.region.y, S.region.w, S.region.h, 0, 0, work.width, work.height);
+  ctx.drawImage(srcEl(), S.region.x, S.region.y, S.region.w, S.region.h, 0, 0, work.width, work.height);
   const img = ctx.getImageData(0,0,work.width,work.height).data;
   const cw = work.width/cols, ch = work.height/rows;
 
@@ -963,6 +1071,9 @@ function render(){
   document.getElementById('betAmt').textContent = bet.amt ? bet.amt.toLocaleString() : '0 (관망)';
   document.getElementById('betAmt').style.color = bet.amt ? '#8fb4ff' : '#aab';
   document.getElementById('betNote').innerHTML = bet.note;
+  const qb = document.getElementById('qBet');
+  qb.textContent = a.pick === 'SKIP' ? '관망'
+    : `${a.pick === 'B' ? '뱅커' : '플레이어'} · ${bet.amt ? bet.amt.toLocaleString() : 0}`;
 
   renderLib(a);
 
