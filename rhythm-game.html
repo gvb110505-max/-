@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>비트 타일 - 리듬 게임</title>
+<style>
+  :root {
+    --bg: #080a15;
+    --panel: rgba(255,255,255,0.055);
+    --panel2: rgba(255,255,255,0.09);
+    --line: rgba(255,255,255,0.12);
+    --text: #f3f5ff;
+    --muted: rgba(243,245,255,0.6);
+    --cyan: #41e2ff;
+    --pink: #ff4fd8;
+    --gold: #ffd84d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
+  .hidden { display: none !important; }
+  .screen { position: fixed; inset: 0; }
+
+  /* ---------- Menu ---------- */
+  #menu {
+    overflow-y: auto;
+    background:
+      radial-gradient(1100px 600px at 15% -10%, rgba(65,226,255,0.15), transparent 60%),
+      radial-gradient(900px 600px at 110% 5%, rgba(255,79,216,0.13), transparent 60%),
+      var(--bg);
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 22px 16px 60px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  .back-link { display: inline-block; color: var(--muted); text-decoration: none; font-size: 13px; margin-bottom: 4px; }
+  .back-link:hover { color: var(--text); }
+  .logo {
+    font-size: 30px; font-weight: 900; letter-spacing: 2px; line-height: 1.1;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .icon-btn {
+    width: 42px; height: 42px; flex: none; border-radius: 12px; font-size: 18px;
+    background: var(--panel); border: 1px solid var(--line);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: var(--panel2); }
+
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    padding: 28px 16px; border: 2px dashed rgba(65,226,255,0.45); border-radius: 18px;
+    background: rgba(65,226,255,0.05); cursor: pointer; text-align: center; transition: background .15s, border-color .15s;
+  }
+  .drop:hover, .drop.over { background: rgba(65,226,255,0.11); border-color: var(--cyan); }
+  .drop .big { font-size: 34px; }
+  .drop b { font-size: 16px; }
+  .drop span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  #queue { margin-top: 12px; display: grid; gap: 8px; }
+  .q { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .q-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .q-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .q-msg { color: var(--muted); flex: none; }
+  .q.err .q-msg { color: #ff7a90; }
+  .q-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); margin-top: 8px; overflow: hidden; }
+  .q-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--pink)); transition: width .2s; }
+
+  .list-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 26px 0 12px; }
+  .list-head h2 { font-size: 18px; }
+  .list-head h2 small { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .btn {
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+    background: var(--panel2); border: 1px solid var(--line); white-space: nowrap;
+  }
+  .btn:hover { background: rgba(255,255,255,0.14); }
+  .btn.primary { background: linear-gradient(90deg, var(--cyan), var(--pink)); color: #0b0d1a; border: none; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 30px 10px; line-height: 1.7;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+  .song { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+  .song-top { display: flex; align-items: center; gap: 12px; }
+  .song-art {
+    width: 46px; height: 46px; border-radius: 12px; flex: none; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900;
+    background: linear-gradient(135deg, hsl(var(--h), 90%, 60%), hsl(calc(var(--h) + 60), 90%, 55%));
+    color: rgba(0,0,0,0.55);
+  }
+  .song-info { flex: 1; min-width: 0; }
+  .song-title { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song-meta { font-size: 12px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song-actions { display: flex; gap: 6px; flex: none; }
+  .mini { width: 32px; height: 32px; border-radius: 9px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  .mini:hover { color: var(--text); background: var(--panel2); }
+  .diffs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+  .diff {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px 8px; border-radius: 12px;
+    border: 1px solid var(--line);
+    border-color: color-mix(in srgb, var(--c) 55%, transparent);
+    background: color-mix(in srgb, var(--c) 12%, transparent);
+    transition: transform .1s, background .15s;
+  }
+  .diff:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--c) 24%, transparent); }
+  .diff .dn { font-size: 10px; font-weight: 800; letter-spacing: .3px; color: var(--c); white-space: nowrap; }
+  .diff .dl { font-size: 17px; font-weight: 900; }
+  .diff .db { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  footer.help { margin-top: 26px; font-size: 12px; color: var(--muted); line-height: 1.8; text-align: center; }
+  kbd { display: inline-block; min-width: 20px; padding: 1px 5px; border-radius: 5px; background: var(--panel2); border: 1px solid var(--line); font-family: inherit; font-size: 11px; }
+  .notice { font-size: 12px; color: #ffcf7a; margin-top: 10px; text-align: center; }
+
+  /* ---------- Modal ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(4,5,12,0.72); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal-card {
+    width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto;
+    background: #12152a; border: 1px solid var(--line); border-radius: 18px; padding: 20px;
+  }
+  .modal-card h3 { font-size: 18px; margin-bottom: 14px; }
+  .set-row { margin-bottom: 16px; }
+  .set-row .lbl { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+  .set-row .lbl b { color: var(--cyan); }
+  .set-row input[type=range] { width: 100%; accent-color: var(--cyan); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .check { display: flex; align-items: center; gap: 9px; font-size: 14px; margin-bottom: 12px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--pink); }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .keys button { padding: 10px 0; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); font-weight: 800; }
+  .keys button.wait { border-color: var(--pink); color: var(--pink); }
+  .modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+  /* ---------- Game ---------- */
+  #game { background: #05060d; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #cv { position: absolute; inset: 0; display: block; touch-action: none; }
+  #pauseBtn { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255,255,255,0.08); }
+
+  .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(4,5,12,0.78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .panel {
+    width: 100%; max-width: 400px; background: #12152a; border: 1px solid var(--line); border-radius: 20px; padding: 22px; text-align: center;
+  }
+  .panel h2 { font-size: 22px; margin-bottom: 16px; letter-spacing: 1px; }
+  .stack { display: grid; gap: 10px; }
+  .stack .btn { padding: 13px; font-size: 15px; }
+
+  .res-title { font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .res-diff { font-size: 13px; font-weight: 800; margin-top: 3px; letter-spacing: .5px; }
+  .res-rank { font-size: 84px; font-weight: 900; line-height: 1; margin: 12px 0 2px; text-shadow: 0 0 28px currentColor; }
+  .res-flag { font-size: 13px; font-weight: 900; letter-spacing: 2px; min-height: 18px; color: var(--gold); }
+  .res-score { font-size: 34px; font-weight: 900; letter-spacing: 2px; margin: 6px 0 2px; }
+  .res-new { font-size: 12px; font-weight: 900; color: var(--pink); letter-spacing: 1px; min-height: 16px; }
+  .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 14px 0 18px; font-size: 14px; text-align: left; }
+  .res-grid div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 9px; background: var(--panel); }
+  .res-grid b { font-weight: 800; }
+  .res-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .res-btns .btn { padding: 12px; font-size: 15px; }
+
+  #loading { z-index: 40; flex-direction: column; gap: 14px; font-size: 14px; color: var(--muted); }
+  .spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--cyan); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; max-width: calc(100% - 32px);
+    background: #1d2140; border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; font-size: 13px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+
+  @media (max-width: 520px) {
+    .logo { font-size: 25px; }
+    .diffs { gap: 5px; }
+    .diff .dn { font-size: 8.5px; letter-spacing: 0; }
+    .diff .dl { font-size: 15px; }
+    .diff .db { font-size: 9px; }
+    .res-rank { font-size: 70px; }
+    .res-score { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Song select ===== -->
+<div id="menu" class="screen">
+  <div class="wrap">
+    <a class="back-link" href="index.html">← 아케이드로</a>
+    <header class="top">
+      <div>
+        <div class="logo">BEAT TILES</div>
+        <div class="tagline">MP3를 등록하면 곡의 리듬을 분석해 타일(노트)이 자동 생성됩니다</div>
+      </div>
+      <button class="icon-btn" id="settingsBtn" title="설정" aria-label="설정"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </header>
+
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" accept=".mp3,audio/mpeg,audio/*" multiple hidden>
+      <div class="big">🎵</div>
+      <b>MP3 파일을 끌어다 놓거나 눌러서 곡 등록</b>
+      <span>WAV · OGG · M4A도 가능 · 분석은 브라우저 안에서 진행되고 곡은 이 기기에 저장됩니다</span>
+    </label>
+    <div id="queue"></div>
+    <div id="storageNotice" class="notice hidden">이 브라우저는 저장소를 쓸 수 없어 새로고침하면 등록한 곡이 사라집니다.</div>
+
+    <div class="list-head">
+      <h2>곡 목록<small id="songCount"></small></h2>
+      <button class="btn" id="demoBtn">＋ 데모 곡 만들기</button>
+    </div>
+    <div id="songs"></div>
+    <div id="empty" class="empty hidden">
+      아직 등록된 곡이 없어요.<br>
+      위에서 MP3를 등록하거나 <b>데모 곡 만들기</b>로 바로 체험해 보세요.
+    </div>
+
+    <footer class="help">
+      난이도: <b style="color:#4ade80">EASY</b> · <b style="color:#38bdf8">NORMAL</b> · <b style="color:#fb923c">HARD</b> ·
+      <b style="color:#f43f5e">VERY HARD</b> · <b style="color:#c084fc">CRAZY</b><br>
+      조작: <span id="keyHelp"><kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd></span> · 모바일은 레인 터치 · 롱노트는 끝까지 누르기 · <kbd>ESC</kbd> 일시정지
+    </footer>
+  </div>
+</div>
+
+<!-- ===== Settings ===== -->
+<div id="settings" class="modal hidden">
+  <div class="modal-card">
+    <h3>설정</h3>
+    <div class="set-row">
+      <div class="lbl"><span>노트 속도</span><b id="speedVal"></b></div>
+      <input type="range" id="speed" min="1" max="6" step="0.1">
+    </div>
+    <div class="set-row">
+      <div class="lbl"><span>싱크 오프셋</span><b id="offsetVal"></b></div>
+      <input type="range" id="offset" min="-200" max="200" step="5">
+      <div class="hint">LATE가 자주 뜨면 + 쪽으로, EARLY가 자주 뜨면 − 쪽으로 옮기세요.</div>
+    </div>
+    <div class="set-row">
+      <div class="lbl"><span>음량</span><b id="volVal"></b></div>
+      <input type="range" id="volume" min="0" max="100" step="1">
+    </div>
+    <label class="check"><input type="checkbox" id="noFail"> 노페일 (게이지가 바닥나도 계속 진행)</label>
+    <label class="check"><input type="checkbox" id="autoPlay"> 오토 플레이 (채보 미리보기 · 기록 저장 안 됨)</label>
+    <div class="set-row">
+      <div class="lbl"><span>키 설정</span><span class="hint" style="margin:0">버튼을 누른 뒤 원하는 키 입력</span></div>
+      <div class="keys" id="keyBtns"></div>
+    </div>
+    <div class="modal-btns"><button class="btn primary" id="closeSettings">닫기</button></div>
+  </div>
+</div>
+
+<!-- ===== Game ===== -->
+<div id="game" class="screen hidden">
+  <canvas id="cv"></canvas>
+  <button class="icon-btn" id="pauseBtn" aria-label="일시정지">⏸</button>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h2>일시정지</h2>
+    <div class="stack">
+      <button class="btn primary" id="resumeBtn">계속하기</button>
+      <button class="btn" id="restartBtn">처음부터</button>
+      <button class="btn" id="quitBtn">곡 선택으로</button>
+    </div>
+  </div>
+</div>
+
+<div id="result" class="overlay hidden">
+  <div class="panel">
+    <div class="res-title" id="resTitle"></div>
+    <div class="res-diff" id="resDiff"></div>
+    <div class="res-rank" id="resRank"></div>
+    <div class="res-flag" id="resFlag"></div>
+    <div class="res-score" id="resScore"></div>
+    <div class="res-new" id="resNew"></div>
+    <div class="res-grid" id="resGrid"></div>
+    <div class="res-btns">
+      <button class="btn" id="resBack">곡 선택</button>
+      <button class="btn primary" id="resRetry">다시 하기</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading" class="overlay hidden"><div class="spinner"></div><div id="loadingText">불러오는 중...</div></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+'use strict';
+(function () {
+  // =====================================================================
+  //  Utilities
+  // =====================================================================
+  const $ = (s) => document.querySelector(s);
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hashStr(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // yield to the UI; background analysis also waits while a song is being played
+  const yieldUI = async () => { await sleep(0); while (game.active) await sleep(250); };
+
+  let toastTimer = 0;
+  function toast(msg, ms = 2600) {
+    const el = $('#toast');
+    el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), ms);
+  }
+  function showLoading(text) { $('#loadingText').textContent = text; $('#loading').classList.remove('hidden'); }
+  function hideLoading() { $('#loading').classList.add('hidden'); }
+
+  // =====================================================================
+  //  Difficulty definitions
+  // =====================================================================
+  //  subW     : weight of each 16th position in a beat (0 = on beat, 2 = 8th, 1/3 = 16ths)
+  //  nps      : target notes per second
+  //  minGap   : minimum seconds between note events
+  //  chord    : share of strongest events that become 2-note chords (maxChord 3 = triples too)
+  //  hold     : chance of a long note when there is a gap of holdBeats after a note
+  //  under    : chance of a long note held while other lanes keep going
+  const DIFFS = [
+    { key: 'easy',   name: 'EASY',      ko: '이지',     color: '#4ade80', subW: [1, 0, 0, 0],          nps: 1.3, minGap: 0.40,  chord: 0,    maxChord: 1, chordGap: 9,    hold: 0.40, holdBeats: 1.5, under: 0,    jackGap: 0.55, floor: 0.10,  missDmg: 4 },
+    { key: 'normal', name: 'NORMAL',    ko: '노말',     color: '#38bdf8', subW: [1, 0, 0.8, 0],        nps: 2.3, minGap: 0.24,  chord: 0.05, maxChord: 2, chordGap: 0.45, hold: 0.50, holdBeats: 1.25, under: 0.03, jackGap: 0.40, floor: 0.08,  missDmg: 5 },
+    { key: 'hard',   name: 'HARD',      ko: '하드',     color: '#fb923c', subW: [1, 0.45, 0.85, 0.45], nps: 3.6, minGap: 0.14,  chord: 0.12, maxChord: 2, chordGap: 0.26, hold: 0.45, holdBeats: 1,   under: 0.06, jackGap: 0.28, floor: 0.06,  missDmg: 6 },
+    { key: 'vhard',  name: 'VERY HARD', ko: '베리하드', color: '#f43f5e', subW: [1, 0.75, 0.9, 0.75],  nps: 5.3, minGap: 0.095, chord: 0.20, maxChord: 2, chordGap: 0.17, hold: 0.40, holdBeats: 1,   under: 0.10, jackGap: 0.19, floor: 0.045, missDmg: 7 },
+    { key: 'crazy',  name: 'CRAZY',     ko: '크레이지', color: '#c084fc', subW: [1, 0.9, 0.95, 0.9],   nps: 8.0, minGap: 0.058, chord: 0.30, maxChord: 3, chordGap: 0.11, hold: 0.35, holdBeats: 1,   under: 0.14, jackGap: 0.12, floor: 0.03,  missDmg: 8 },
+  ];
+  const DIFF_BY_KEY = Object.fromEntries(DIFFS.map((d) => [d.key, d]));
+
+  // =====================================================================
+  //  Storage (IndexedDB: song metadata + audio blobs kept in separate stores)
+  // =====================================================================
+  const DB = (() => {
+    let dbp = null;
+    let persistent = true;
+    const mem = { songs: new Map(), audio: new Map() };
+    function open() {
+      if (dbp) return dbp;
+      dbp = new Promise((res) => {
+        try {
+          const r = indexedDB.open('beat-tiles', 1);
+          r.onupgradeneeded = () => {
+            r.result.createObjectStore('songs', { keyPath: 'id' });
+            r.result.createObjectStore('audio');
+          };
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => { persistent = false; res(null); };
+          r.onblocked = () => { persistent = false; res(null); };
+        } catch (e) { persistent = false; res(null); }
+      });
+      return dbp;
+    }
+    async function run(store, mode, fn) {
+      const db = await open();
+      if (!db) return fn(null, mem[store]);
+      return new Promise((res, rej) => {
+        const tx = db.transaction(store, mode);
+        let out;
+        const req = fn(tx.objectStore(store));
+        if (req) req.onsuccess = () => { out = req.result; };
+        tx.oncomplete = () => res(out);
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error);
+      });
+    }
+    return {
+      isPersistent: async () => { await open(); return persistent; },
+      allSongs: () => run('songs', 'readonly', (st, m) => (st ? st.getAll() : void 0)).then((r) => r || [...mem.songs.values()]),
+      putSong: (rec) => run('songs', 'readwrite', (st, m) => (st ? st.put(rec) : void m.set(rec.id, rec))),
+      getAudio: (id) => run('audio', 'readonly', (st, m) => (st ? st.get(id) : void 0)).then((r) => r || mem.audio.get(id)),
+      putAudio: (id, blob) => run('audio', 'readwrite', (st, m) => (st ? st.put(blob, id) : void m.set(id, blob))),
+      del: async (id) => {
+        await run('songs', 'readwrite', (st, m) => (st ? st.delete(id) : void m.delete(id)));
+        await run('audio', 'readwrite', (st, m) => (st ? st.delete(id) : void m.delete(id)));
+      },
+    };
+  })();
+
+  // =====================================================================
+  //  Settings
+  // =====================================================================
+  const SETTINGS_KEY = 'beat_tiles_settings_v1';
+  const DEFAULT_SETTINGS = { speed: 2.2, offset: 0, volume: 85, noFail: false, auto: false, keys: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'] };
+  let settings = { ...DEFAULT_SETTINGS };
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (raw && typeof raw === 'object') settings = { ...DEFAULT_SETTINGS, ...raw };
+    if (!Array.isArray(settings.keys) || settings.keys.length !== 4) settings.keys = DEFAULT_SETTINGS.keys.slice();
+  } catch (e) { /* ignore */ }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ } }
+  function keyLabel(code) {
+    if (!code) return '?';
+    if (code.startsWith('Key')) return code.slice(3);
+    if (code.startsWith('Digit')) return code.slice(5);
+    if (code.startsWith('Numpad')) return 'N' + code.slice(6);
+    const map = { Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Space: 'SPC', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', ShiftLeft: 'LSh', ShiftRight: 'RSh', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`' };
+    return map[code] || code.slice(0, 4);
+  }
+
+  // =====================================================================
+  //  Audio
+  // =====================================================================
+  let audioCtx = null;
+  function getCtx() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try { audioCtx = new AC({ latencyHint: 'interactive' }); } catch (e) { audioCtx = new AC(); }
+    }
+    return audioCtx;
+  }
+  function decodeAudio(ab) {
+    const ctx = getCtx();
+    return new Promise((res, rej) => {
+      const p = ctx.decodeAudioData(ab, res, rej);
+      if (p && p.then) p.then(res, rej);
+    });
+  }
+  const decodedCache = new Map();
+  function cacheBuffer(id, buf) {
+    decodedCache.delete(id);
+    decodedCache.set(id, buf);
+    while (decodedCache.size > 2) decodedCache.delete(decodedCache.keys().next().value);
+  }
+  async function getSongBuffer(song) {
+    if (decodedCache.has(song.id)) return decodedCache.get(song.id);
+    const blob = await DB.getAudio(song.id);
+    if (!blob) throw new Error('오디오 데이터를 찾을 수 없습니다');
+    const buf = await decodeAudio(await new Response(blob).arrayBuffer());
+    cacheBuffer(song.id, buf);
+    return buf;
+  }
+
+  // ID3v2 title / artist (handles UTF-8/16 and the CP949 tags common in Korean MP3s)
+  function readID3(u8) {
+    const out = {};
+    try {
+      if (u8.length < 10 || u8[0] !== 0x49 || u8[1] !== 0x44 || u8[2] !== 0x33) return out;
+      const ver = u8[3], flags = u8[5];
+      const ss = (p) => ((u8[p] & 0x7f) << 21) | ((u8[p + 1] & 0x7f) << 14) | ((u8[p + 2] & 0x7f) << 7) | (u8[p + 3] & 0x7f);
+      const be = (p) => ((u8[p] << 24) | (u8[p + 1] << 16) | (u8[p + 2] << 8) | u8[p + 3]) >>> 0;
+      const end = Math.min(u8.length, 10 + ss(6));
+      let p = 10;
+      if (flags & 0x40 && ver >= 3) p += ver === 4 ? ss(10) : be(10) + 4;
+      const hdr = ver === 2 ? 6 : 10;
+      while (p + hdr <= end) {
+        const id = String.fromCharCode(...u8.subarray(p, p + (ver === 2 ? 3 : 4)));
+        if (!/^[A-Z0-9]{3,4}$/.test(id)) break;
+        const size = ver === 2 ? (u8[p + 3] << 16) | (u8[p + 4] << 8) | u8[p + 5] : ver === 4 ? ss(p + 4) : be(p + 4);
+        if (size <= 0 || p + hdr + size > end) break;
+        const body = u8.subarray(p + hdr, p + hdr + size);
+        if (id === 'TIT2' || id === 'TT2') out.title = id3Text(body);
+        else if (id === 'TPE1' || id === 'TP1') out.artist = id3Text(body);
+        p += hdr + size;
+      }
+    } catch (e) { /* ignore malformed tags */ }
+    return out;
+  }
+  function id3Text(b) {
+    const enc = b[0];
+    let d = b.subarray(1), s = '';
+    if (enc === 1 || enc === 2) {
+      let le = enc === 1;
+      if (d[0] === 0xff && d[1] === 0xfe) { le = true; d = d.subarray(2); } else if (d[0] === 0xfe && d[1] === 0xff) { le = false; d = d.subarray(2); }
+      s = new TextDecoder(le ? 'utf-16le' : 'utf-16be').decode(d);
+    } else if (enc === 3) {
+      s = new TextDecoder('utf-8').decode(d);
+    } else if (d.some((x) => x >= 0x80)) {
+      try { s = new TextDecoder('utf-8', { fatal: true }).decode(d); } catch (e) {
+        try { s = new TextDecoder('euc-kr').decode(d); } catch (e2) { s = String.fromCharCode(...d); }
+      }
+    } else {
+      s = String.fromCharCode(...d);
+    }
+    return s.split('\0')[0].trim();
+  }
+
+  // =====================================================================
+  //  Rhythm analysis
+  //  1. resample to 22.05 kHz mono
+  //  2. STFT -> log-compressed spectral flux in low / mid / high bands
+  //  3. onset envelope -> tempo (autocorrelation) -> beat tracking (dynamic programming)
+  //  4. beat grid (constant tempo fit when possible) split into 16ths
+  //  5. onset peaks snapped to the grid = candidate note slots
+  // =====================================================================
+  const ANALYZER_VER = 1;
+  const A_SR = 22050, A_N = 1024, A_HOP = 256, A_HOPS = A_HOP / A_SR;
+  const A_LAT = 0.028; // flux peak -> audible onset offset (calibrated against synthetic drums)
+
+  let fftCache = null;
+  function getFFT(n) {
+    if (fftCache && fftCache.n === n) return fftCache.fn;
+    const levels = Math.round(Math.log2(n));
+    const rev = new Uint32Array(n);
+    for (let i = 0; i < n; i++) { let r = 0, x = i; for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+    const cs = new Float32Array(n / 2), sn = new Float32Array(n / 2);
+    for (let i = 0; i < n / 2; i++) { cs[i] = Math.cos((2 * Math.PI * i) / n); sn[i] = Math.sin((2 * Math.PI * i) / n); }
+    const fn = (re, im) => {
+      for (let i = 0; i < n; i++) {
+        const j = rev[i];
+        if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+      }
+      for (let size = 2; size <= n; size <<= 1) {
+        const half = size >> 1, step = n / size;
+        for (let i = 0; i < n; i += size) {
+          for (let j = i, k = 0; j < i + half; j++, k += step) {
+            const l = j + half;
+            const tr = re[l] * cs[k] + im[l] * sn[k];
+            const ti = im[l] * cs[k] - re[l] * sn[k];
+            re[l] = re[j] - tr; im[l] = im[j] - ti;
+            re[j] += tr; im[j] += ti;
+          }
+        }
+      }
+    };
+    fftCache = { n, fn };
+    return fn;
+  }
+  function pctl(a, p) {
+    const b = Float32Array.from(a).sort();
+    return b[Math.min(b.length - 1, Math.floor(p * (b.length - 1)))];
+  }
+  function norm98(a) {
+    const v = pctl(a, 0.98);
+    if (v > 1e-9) return v;
+    let m = 0; for (let i = 0; i < a.length; i++) if (a[i] > m) m = a[i];
+    return m || 1;
+  }
+  function movingMedian(a, r) {
+    const n = a.length, out = new Float32Array(n), w = new Float32Array(2 * r + 1);
+    for (let i = 0; i < n; i++) {
+      const lo = Math.max(0, i - r), hi = Math.min(n - 1, i + r), m = hi - lo + 1;
+      for (let j = 0; j < m; j++) w[j] = a[lo + j];
+      const sub = w.subarray(0, m); sub.sort();
+      out[i] = sub[m >> 1];
+    }
+    return out;
+  }
+  function gaussSmooth(a, sigma) {
+    const r = Math.ceil(sigma * 3), k = new Float32Array(2 * r + 1);
+    let s = 0;
+    for (let i = -r; i <= r; i++) { k[i + r] = Math.exp(-0.5 * (i / sigma) ** 2); s += k[i + r]; }
+    const n = a.length, out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let acc = 0;
+      for (let j = -r; j <= r; j++) { const x = i + j; if (x >= 0 && x < n) acc += a[x] * k[j + r]; }
+      out[i] = acc / s;
+    }
+    return out;
+  }
+  // Least-squares fit of beat times to a constant tempo, rejecting outliers
+  function fitBeats(bt, Psec) {
+    const n = bt.length, idx = new Float64Array(n);
+    for (let i = 1; i < n; i++) idx[i] = idx[i - 1] + Math.max(1, Math.round((bt[i] - bt[i - 1]) / Psec));
+    const inl = new Uint8Array(n).fill(1);
+    let a = bt[0], b = Psec;
+    for (let it = 0; it < 4; it++) {
+      let m = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let i = 0; i < n; i++) if (inl[i]) { m++; sx += idx[i]; sy += bt[i]; sxx += idx[i] * idx[i]; sxy += idx[i] * bt[i]; }
+      const den = m * sxx - sx * sx;
+      if (m < 4 || Math.abs(den) < 1e-9) break;
+      b = (m * sxy - sx * sy) / den; a = (sy - b * sx) / m;
+      const tol = it === 0 ? 0.08 : 0.05;
+      for (let i = 0; i < n; i++) inl[i] = Math.abs(bt[i] - (a + b * idx[i])) < tol ? 1 : 0;
+    }
+    let m = 0, ss = 0;
+    for (let i = 0; i < n; i++) if (inl[i]) { const r = bt[i] - (a + b * idx[i]); ss += r * r; m++; }
+    return { a, b, idx, std: m ? Math.sqrt(ss / m) : 1, frac: m / n };
+  }
+  // Variable tempo: local linear smoothing of tracked beats, filling skipped beats
+  function smoothBeats(bt, idx) {
+    const n = bt.length, sm = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const lo = Math.max(0, i - 4), hi = Math.min(n - 1, i + 4);
+      let m = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let j = lo; j <= hi; j++) { m++; sx += idx[j]; sy += bt[j]; sxx += idx[j] * idx[j]; sxy += idx[j] * bt[j]; }
+      const den = m * sxx - sx * sx;
+      if (Math.abs(den) < 1e-9) { sm[i] = bt[i]; continue; }
+      const b = (m * sxy - sx * sy) / den, a = (sy - b * sx) / m;
+      sm[i] = a + b * idx[i];
+    }
+    const res = [];
+    for (let i = 0; i < n; i++) {
+      res.push(sm[i]);
+      if (i + 1 < n) { const g = idx[i + 1] - idx[i]; for (let k = 1; k < g; k++) res.push(sm[i] + ((sm[i + 1] - sm[i]) * k) / g); }
+    }
+    return res;
+  }
+
+  async function analyzeBuffer(buf, onProg = () => {}) {
+    const len = Math.max(A_N * 2, Math.ceil(buf.duration * A_SR));
+    const off = new OfflineAudioContext(1, len, A_SR);
+    const src = off.createBufferSource();
+    src.buffer = buf; src.connect(off.destination); src.start(0);
+    const mono = (await off.startRendering()).getChannelData(0);
+    onProg(0.12);
+    return analyzeSamples(mono, buf.duration, onProg);
+  }
+
+  async function analyzeSamples(x, duration, onProg = () => {}) {
+    const N = A_N, HOP = A_HOP, H2 = N / 2;
+    const nF = Math.max(8, Math.floor((x.length - N) / HOP) + 1);
+    const win = new Float32Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N);
+    const fft = getFFT(N);
+    const re = new Float32Array(N), im = new Float32Array(N), mag = new Float32Array(H2), prevLog = new Float32Array(H2);
+    const fl = new Float32Array(nF), fm = new Float32Array(nF), fh = new Float32Array(nF);
+    const cen = new Float32Array(nF), rms = new Float32Array(nF);
+    const B1 = 2, B2 = 9, B3 = 117, B4 = 465; // ~43-190 Hz | 190-2.5k Hz | 2.5k-10k Hz
+    const sc = 4 / N;
+
+    const take = (fi) => {
+      let sl = 0, sm = 0, sh = 0, cn = 0, cd = 0;
+      for (let k = B1; k < B4; k++) {
+        const m = mag[k], v = Math.log1p(100 * m), d = v - prevLog[k];
+        prevLog[k] = v;
+        if (d > 0) { if (k < B2) sl += d; else if (k < B3) sm += d; else sh += d; }
+        if (k >= 5 && k < 372) { cn += k * m; cd += m; }
+      }
+      fl[fi] = sl / (B2 - B1); fm[fi] = sm / (B3 - B2); fh[fi] = sh / (B4 - B3);
+      cen[fi] = cd > 1e-7 ? cn / cd : 0;
+      const c0 = fi * HOP + (N >> 1) - (HOP >> 1);
+      let e = 0;
+      for (let i = 0; i < HOP; i++) { const s = x[c0 + i] || 0; e += s * s; }
+      rms[fi] = Math.sqrt(e / HOP);
+    };
+
+    // two real frames per complex FFT
+    for (let f = 0; f < nF; f += 2) {
+      const o1 = f * HOP, o2 = o1 + HOP, has2 = f + 1 < nF;
+      for (let i = 0; i < N; i++) { re[i] = (x[o1 + i] || 0) * win[i]; im[i] = has2 ? (x[o2 + i] || 0) * win[i] : 0; }
+      fft(re, im);
+      for (let k = 1; k < H2; k++) { const j = N - k, ar = re[k] + re[j], ai = im[k] - im[j]; mag[k] = 0.5 * Math.sqrt(ar * ar + ai * ai) * sc; }
+      take(f);
+      if (has2) {
+        for (let k = 1; k < H2; k++) { const j = N - k, br = re[k] - re[j], bi = im[k] + im[j]; mag[k] = 0.5 * Math.sqrt(br * br + bi * bi) * sc; }
+        take(f + 1);
+      }
+      if ((f & 1023) === 0) { onProg(0.12 + (0.6 * f) / nF); await yieldUI(); }
+    }
+    fl[0] = fm[0] = fh[0] = 0;
+
+    // ---- onset envelope
+    const nl = norm98(fl), nm = norm98(fm), nh = norm98(fh);
+    const O = new Float32Array(nF);
+    for (let i = 0; i < nF; i++) O[i] = (fl[i] / nl + fm[i] / nm + (0.6 * fh[i]) / nh) / 2.6;
+    const base = movingMedian(O, 10);
+    const Oc = new Float32Array(nF);
+    for (let i = 0; i < nF; i++) Oc[i] = Math.max(0, O[i] - base[i]);
+    const normO = norm98(Oc);
+    let rmax = 1e-9;
+    for (let i = 0; i < nF; i++) if (rms[i] > rmax) rmax = rms[i];
+    const ldb = new Float32Array(nF), rmsN = new Float32Array(nF), rp = new Float64Array(nF + 1);
+    for (let i = 0; i < nF; i++) { rmsN[i] = rms[i] / rmax; ldb[i] = 20 * Math.log10(rmsN[i] + 1e-9); rp[i + 1] = rp[i] + rmsN[i]; }
+    onProg(0.76); await yieldUI();
+
+    // ---- tempo (autocorrelation with a log-gaussian preference around 120 BPM)
+    let mean = 0;
+    for (let i = 0; i < nF; i++) mean += Oc[i];
+    mean /= nF;
+    let vr = 0;
+    for (let i = 0; i < nF; i++) vr += (Oc[i] - mean) ** 2;
+    const sd = Math.sqrt(vr / nF) || 1;
+    const Z = new Float32Array(nF);
+    for (let i = 0; i < nF; i++) Z[i] = (Oc[i] - mean) / sd;
+    const minLag = Math.floor(60 / 200 / A_HOPS), maxLag = Math.ceil(60 / 65 / A_HOPS);
+    const ac = new Float64Array(2 * maxLag + 2);
+    for (let lag = minLag; lag <= 2 * maxLag + 1; lag++) {
+      let s = 0;
+      for (let i = 0; i + lag < nF; i++) s += Z[i] * Z[i + lag];
+      ac[lag] = s / Math.max(1, nF - lag);
+    }
+    const S = new Float64Array(maxLag + 2);
+    let bestLag = minLag, bestS = -Infinity;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      const bpm = 60 / (lag * A_HOPS);
+      const w = Math.exp(-0.5 * (Math.log2(bpm / 120) / 0.9) ** 2);
+      S[lag] = (ac[lag] + 0.5 * ac[2 * lag]) * w;
+      if (S[lag] > bestS) { bestS = S[lag]; bestLag = lag; }
+    }
+    let P = bestLag;
+    if (bestLag > minLag && bestLag < maxLag) {
+      const a = S[bestLag - 1], b = S[bestLag], c = S[bestLag + 1], den = a - 2 * b + c;
+      if (den < 0) P = bestLag + (0.5 * (a - c)) / den;
+    }
+    onProg(0.8); await yieldUI();
+
+    // ---- beat tracking (Ellis-style dynamic programming)
+    const On = new Float32Array(nF);
+    for (let i = 0; i < nF; i++) On[i] = Oc[i] / sd;
+    const Os = gaussSmooth(On, Math.max(0.8, P / 32));
+    const lo = Math.max(1, Math.round(P * 0.5)), hi = Math.round(P * 2);
+    const pen = new Float64Array(hi + 1);
+    for (let d = lo; d <= hi; d++) pen[d] = -100 * Math.log(d / P) ** 2;
+    const C = new Float64Array(nF), back = new Int32Array(nF);
+    for (let t = 0; t < nF; t++) {
+      let best = -Infinity, bi = -1;
+      for (let d = lo; d <= hi && d <= t; d++) { const v = C[t - d] + pen[d]; if (v > best) { best = v; bi = t - d; } }
+      C[t] = Os[t] + (bi >= 0 ? best : 0);
+      back[t] = bi;
+    }
+    let endF = nF - 1, bestC = -Infinity;
+    for (let t = Math.max(0, nF - Math.round(P)); t < nF; t++) if (C[t] > bestC) { bestC = C[t]; endF = t; }
+    const path = [];
+    for (let t = endF; t >= 0; t = back[t]) path.push(t);
+    path.reverse();
+    let fa = 0; while (fa < nF - 1 && ldb[fa] < -38) fa++;
+    let fb = nF - 1; while (fb > 0 && ldb[fb] < -38) fb--;
+    const beatsF = path.filter((b) => b >= fa - P * 0.5 && b <= fb + P * 0.5);
+    onProg(0.86); await yieldUI();
+
+    // ---- beat grid
+    const Psec = P * A_HOPS;
+    let beatT = [], constant = false, bpm = 60 / Psec;
+    if (beatsF.length >= 8) {
+      const bt = beatsF.map((b) => b * A_HOPS + A_LAT);
+      const fit = fitBeats(bt, Psec);
+      if (fit.frac >= 0.8 && fit.std < 0.022 && fit.b > 0.2) {
+        constant = true; bpm = 60 / fit.b;
+        for (let k = Math.ceil(-fit.a / fit.b) - 1; fit.a + k * fit.b <= duration + fit.b; k++) beatT.push(fit.a + k * fit.b);
+      } else {
+        beatT = smoothBeats(bt, fit.idx);
+        const d0 = Math.max(0.2, beatT[1] - beatT[0]);
+        while (beatT[0] > 0) beatT.unshift(beatT[0] - d0);
+        const d1 = Math.max(0.2, beatT[beatT.length - 1] - beatT[beatT.length - 2]);
+        while (beatT[beatT.length - 1] < duration) beatT.push(beatT[beatT.length - 1] + d1);
+        const ds = [];
+        for (let i = 1; i < beatT.length; i++) ds.push(beatT[i] - beatT[i - 1]);
+        ds.sort((p, q) => p - q);
+        bpm = 60 / ds[ds.length >> 1];
+      }
+    } else {
+      for (let t = A_LAT - Psec; t < duration + Psec; t += Psec) beatT.push(t);
+    }
+    // a slow tempo is often half the real one: split beats so 16ths of the real tempo stay on the grid
+    let doubled = false;
+    if (bpm < 95) {
+      const nb = [];
+      for (let i = 0; i < beatT.length; i++) { nb.push(beatT[i]); if (i + 1 < beatT.length) nb.push((beatT[i] + beatT[i + 1]) / 2); }
+      beatT = nb; bpm *= 2; doubled = true;
+    }
+
+    const slots = [];
+    for (let i = 0; i + 1 < beatT.length; i++) {
+      const b0 = beatT[i], bl = beatT[i + 1] - b0;
+      for (let j = 0; j < 4; j++) {
+        const t = b0 + (j * bl) / 4;
+        if (t < 0.03 || t > duration - 0.05) continue;
+        slots.push({ gt: t, sub: j, beat: i, bl, pk: -1, str: 0, pt: 0 });
+      }
+    }
+
+    // ---- onset peaks -> nearest 16th slot
+    const thr = 0.04 * normO;
+    for (let f = 3; f < nF - 3 && slots.length; f++) {
+      const v = Oc[f];
+      if (v < thr || v < Oc[f - 1] || v <= Oc[f + 1] || v < Oc[f - 2] || v < Oc[f - 3] || v < Oc[f + 2] || v < Oc[f + 3]) continue;
+      const t = f * A_HOPS + A_LAT;
+      let a = 0, b = slots.length - 1;
+      while (a < b) { const m = (a + b) >> 1; if (slots[m].gt < t) a = m + 1; else b = m; }
+      if (a > 0 && Math.abs(slots[a - 1].gt - t) < Math.abs(slots[a].gt - t)) a--;
+      const s = slots[a];
+      if (Math.abs(s.gt - t) > Math.min(0.06, (0.45 * s.bl) / 4)) continue;
+      const str = v / normO;
+      if (s.pk < 0 || str > s.str) { s.pk = f; s.str = str; s.pt = t; }
+    }
+    const peaks = slots.filter((s) => s.pk >= 0);
+    for (const s of peaks) {
+      const f = s.pk;
+      let c = 0, n = 0;
+      for (let k = f; k < Math.min(nF, f + 4); k++) if (cen[k] > 0) { c += cen[k]; n++; }
+      s.cen = n ? c / n : 0;
+      s.L = fl[f] / nl; s.M = fm[f] / nm; s.H = fh[f] / nh;
+      s.loud = ldb[Math.min(nF - 1, f + 2)];
+      s.t = Math.abs(s.pt - s.gt) <= 0.025 ? s.gt : s.pt;
+    }
+    // strength relative to the surrounding ~6 s so quiet sections still get notes
+    for (let i = 0, j0 = 0, j1 = 0; i < peaks.length; i++) {
+      const t = peaks[i].t;
+      while (peaks[j0].t < t - 3) j0++;
+      while (j1 < peaks.length - 1 && peaks[j1 + 1].t <= t + 3) j1++;
+      let m = 1e-9;
+      for (let j = j0; j <= j1; j++) if (peaks[j].str > m) m = peaks[j].str;
+      peaks[i].lstr = peaks[i].str / m;
+    }
+    const cs = peaks.map((s) => s.cen).sort((p, q) => p - q);
+    for (const s of peaks) {
+      let a = 0, b = cs.length;
+      while (a < b) { const m = (a + b) >> 1; if (cs[m] < s.cen) a = m + 1; else b = m; }
+      s.cp = cs.length > 1 ? a / (cs.length - 1) : 0.5;
+    }
+    let e0 = 0, e1 = 0, s0 = 0, s1 = 0;
+    for (const s of peaks) if (s.sub === 0) { if (s.beat & 1) { e1 += s.L; s1 += s.str; } else { e0 += s.L; s0 += s.str; } }
+    // shown BPM: keep the doubled tempo only if the in-between beats really carry onsets
+    const displayBpm = doubled && s1 < 0.55 * s0 ? bpm / 2 : bpm;
+    // typical loudness of the playing parts (for long-note sustain checks)
+    const act = [];
+    for (let i = 0; i < nF; i += 4) if (ldb[i] > -40) act.push(rmsN[i]);
+    act.sort((p, q) => p - q);
+    const medRms = act.length ? act[act.length >> 1] : 0.1;
+    onProg(0.92);
+    return { duration, bpm, displayBpm, constant, beatT, slots: peaks, strongPar: e1 > e0 ? 1 : 0, rmsN, rp, nF, medRms };
+  }
+
+  // =====================================================================
+  //  Chart generation
+  // =====================================================================
+  function buildChart(feat, cfg, seed) {
+    const rng = mulberry32(seed);
+    const { duration, rmsN, rp, nF } = feat;
+    const cand = feat.slots.filter((s) => cfg.subW[s.sub] > 0 && s.str >= cfg.floor && s.loud > -42 && s.t > 0.25 && s.t < duration - 0.2);
+    if (!cand.length) return { notes: [], level: 1, total: 0, nps: 0 };
+    let first = Infinity, last = -Infinity;
+    for (const s of cand) { if (s.t < first) first = s.t; if (s.t > last) last = s.t; }
+    const active = Math.max(15, last - first);
+    const avgSize = 1 + cfg.chord * (cfg.maxChord > 2 ? 1.35 : 1);
+    const K = Math.round((cfg.nps * active) / avgSize);
+
+    // greedy pick of the strongest slots that respect the minimum gap
+    const scored = cand.map((s) => ({
+      s, sc: (0.6 * Math.pow(s.str, 0.8) + 0.4 * s.lstr) * cfg.subW[s.sub] * (s.sub === 0 && (s.beat & 1) === feat.strongPar ? 1.12 : 1),
+    }));
+    scored.sort((a, b) => b.sc - a.sc || a.s.t - b.s.t);
+    const times = [], ev = [];
+    for (const { s } of scored) {
+      if (ev.length >= K) break;
+      let a = 0, b = times.length;
+      while (a < b) { const m = (a + b) >> 1; if (times[m] < s.t) a = m + 1; else b = m; }
+      if (a > 0 && s.t - times[a - 1] < cfg.minGap) continue;
+      if (a < times.length && times[a] - s.t < cfg.minGap) continue;
+      times.splice(a, 0, s.t); ev.splice(a, 0, s);
+    }
+
+    const strs = ev.map((e) => e.str).sort((a, b) => b - a);
+    const chordThr = cfg.chord > 0 ? strs[Math.floor(cfg.chord * (strs.length - 1))] : Infinity;
+    const tripleThr = cfg.maxChord > 2 ? strs[Math.floor(cfg.chord * 0.25 * (strs.length - 1))] : Infinity;
+
+    // a long note needs sound that keeps going (not a break or silence)
+    const sustained = (t, span) => {
+      const f0 = Math.max(0, Math.round((t - A_LAT) / A_HOPS)) + 4, f1 = Math.min(nF - 1, Math.round((t + span - A_LAT) / A_HOPS));
+      if (f1 - f0 < 6) return false;
+      const mean = (rp[f1] - rp[f0]) / (f1 - f0);
+      let lo = Infinity;
+      for (let f = f0; f <= f1; f += 4) lo = Math.min(lo, rmsN[f]);
+      return mean >= 0.45 * feat.medRms && lo >= 0.12 * feat.medRms;
+    };
+
+    const busyUntil = [-9, -9, -9, -9], lastHit = [-9, -9, -9, -9], use = [0, 0, 0, 0], underLane = [false, false, false, false];
+    let prevLanes = [], prevCp = 0.5, prevT = -9;
+    const notes = [];
+    let holds = 0;
+    for (let i = 0; i < ev.length; i++) {
+      const e = ev[i], t = e.t;
+      const gapPrev = t - prevT, gapNext = (i + 1 < ev.length ? ev[i + 1].t : duration) - t;
+      const free = [0, 1, 2, 3].filter((l) => busyUntil[l] < t - 0.03);
+      if (!free.length) continue;
+      let size = 1;
+      if (e.str >= chordThr && gapPrev >= cfg.chordGap && gapNext >= cfg.chordGap * 0.8) size = e.str >= tripleThr ? 3 : 2;
+      size = Math.min(size, free.length);
+
+      // primary lane: follow the sound's brightness (low -> left, bright -> right) with variety
+      const pref = e.cp * 3, dir = e.cp - prevCp;
+      let best = free[0], bestCost = Infinity;
+      for (const l of free) {
+        let c = Math.abs(l - pref) * 0.7 + use[l] * 0.35;
+        if (prevLanes.length && Math.abs(dir) > 0.1) {
+          const pl = prevLanes[0];
+          if ((dir > 0 && l < pl) || (dir < 0 && l > pl)) c += 0.7;
+        }
+        if (t - lastHit[l] < cfg.jackGap) c += 6; else if (prevLanes.includes(l)) c += 0.9;
+        c += rng() * 1.1;
+        if (c < bestCost) { bestCost = c; best = l; }
+      }
+      const lanes = [best];
+      while (lanes.length < size) {
+        let b2 = -1, c2 = Infinity;
+        for (const l of free) {
+          if (lanes.includes(l)) continue;
+          let c = rng();
+          const dmin = Math.min(...lanes.map((x) => Math.abs(x - l)));
+          if (cfg.maxChord === 2 && cfg.key !== 'vhard' && dmin < 2) c += 1.2;
+          if (t - lastHit[l] < cfg.jackGap) c += 6;
+          if (c < c2) { c2 = c; b2 = l; }
+        }
+        if (b2 < 0) break;
+        lanes.push(b2);
+      }
+
+      // long notes
+      let dur = 0, under = false;
+      const bl = e.bl;
+      if (cfg.hold > 0 && gapNext >= cfg.holdBeats * bl && gapNext >= 0.45 && rng() < cfg.hold) {
+        const hb = bl / 2;
+        let endT = t + gapNext - Math.max(0.5 * bl, 0.2);
+        endT = e.gt + Math.round((endT - e.gt) / hb) * hb;
+        if (endT - t >= Math.max(0.55 * bl, 0.3) && endT <= t + gapNext - 0.15 && sustained(t, endT - t)) dur = endT - t;
+      }
+      if (!dur && cfg.under > 0 && lanes.length === 1 && e.sub === 0 && free.length >= 3 && rng() < cfg.under) {
+        const nUnder = underLane.filter((u, l) => u && busyUntil[l] > t).length;
+        const len = bl * (rng() < 0.5 ? 1 : 2);
+        if (nUnder < (cfg.maxChord > 2 ? 2 : 1) && t + len < duration - 0.3 && sustained(t, len)) { dur = len; under = true; }
+      }
+
+      for (let l = 0; l < 4; l++) use[l] *= 0.85;
+      for (const l of lanes) {
+        notes.push([Math.round(t * 1000), l, Math.round(dur * 1000)]);
+        lastHit[l] = t + dur; use[l] += 1;
+        if (dur) { busyUntil[l] = t + dur + 0.06; underLane[l] = under; holds++; }
+      }
+      prevLanes = lanes; prevCp = e.cp; prevT = t;
+    }
+    const st = chartStats(notes);
+    return { notes, level: st.level, nps: Math.round(st.nps * 100) / 100, total: notes.length + holds };
+  }
+
+  function chartStats(notes) {
+    if (!notes.length) return { level: 1, nps: 0 };
+    const ts = notes.map((n) => n[0] / 1000);
+    const first = ts[0], last = ts[ts.length - 1];
+    const avg = ts.length / Math.max(10, last - first);
+    const dens = [];
+    for (let w = first, j0 = 0, j1 = 0; w <= last; w += 1) {
+      while (j0 < ts.length && ts[j0] < w) j0++;
+      while (j1 < ts.length && ts[j1] < w + 4) j1++;
+      dens.push((j1 - j0) / 4);
+    }
+    dens.sort((a, b) => a - b);
+    const peak = dens.length ? dens[Math.floor(0.9 * (dens.length - 1))] : avg;
+    return { level: clamp(Math.round(1 + avg * 1.1 + peak * 0.5), 1, 30), nps: avg };
+  }
+
+  function buildAllCharts(feat, seed) {
+    const charts = {};
+    let prevLv = 0;
+    DIFFS.forEach((d, i) => {
+      const c = buildChart(feat, d, (seed + i * 7919) >>> 0);
+      c.level = Math.max(c.level, prevLv + 1);
+      prevLv = c.level;
+      charts[d.key] = c;
+    });
+    return charts;
+  }
+
+  // =====================================================================
+  //  Demo track (synthesised so the game can be tried without an MP3)
+  // =====================================================================
+  async function synthDemo() {
+    const sr = 44100, bpm = 124, spb = 60 / bpm, bars = 32, lead = 0.5;
+    const len = Math.ceil((lead + bars * 4 * spb + 3) * sr);
+    const out = new Float32Array(len);
+    const rnd = mulberry32(7);
+    const TAU = Math.PI * 2;
+    const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const T = (bar, step) => lead + ((bar * 16 + step) * spb) / 4;
+    const lpK = (fc) => 1 - Math.exp((-TAU * fc) / sr);
+
+    const kick = (t, v = 1) => {
+      const s0 = Math.round(t * sr), n = Math.min(len - s0, Math.round(0.42 * sr));
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const tt = i / sr;
+        ph += (TAU * (42 + 108 * Math.exp(-tt / 0.035))) / sr;
+        out[s0 + i] += Math.sin(ph) * Math.exp(-tt / 0.12) * Math.min(1, tt / 0.002) * 0.9 * v;
+      }
+    };
+    // filtered noise: band between two one-pole lowpasses (hi = 0 -> plain highpass-ish)
+    const noise = (t, dur, decay, lo, hi, peak) => {
+      const s0 = Math.round(t * sr), n = Math.min(len - s0, Math.round(dur * sr));
+      const kl = lpK(lo), kh = hi ? lpK(hi) : 1;
+      let a = 0, b = 0;
+      for (let i = 0; i < n; i++) {
+        const x = rnd() * 2 - 1;
+        b += kh * (x - b); a += kl * (b - a);
+        out[s0 + i] += (b - a) * Math.exp(-i / sr / decay) * Math.min(1, i / (0.001 * sr)) * peak;
+      }
+    };
+    const hat = (t, v = 1) => noise(t, 0.12, 0.03, 7000, 0, 0.35 * v);
+    const snare = (t, v = 1) => {
+      noise(t, 0.3, 0.07, 900, 6000, 0.9 * v);
+      const s0 = Math.round(t * sr), n = Math.min(len - s0, Math.round(0.15 * sr));
+      for (let i = 0; i < n; i++) out[s0 + i] += Math.sin((TAU * 185 * i) / sr) * Math.exp(-i / sr / 0.04) * 0.4 * v;
+    };
+    const crash = (t) => noise(t, 2.6, 0.7, 3500, 0, 0.35);
+    // oscillator voice with one-pole lowpass + attack/release envelope
+    const tone = (t, m, d, wave, peak, cutoff, detune = 0) => {
+      const s0 = Math.round(t * sr), rel = 0.08, n = Math.min(len - s0, Math.round((d + rel) * sr));
+      const f = mtof(m) * Math.pow(2, detune / 1200), k = lpK(cutoff);
+      let ph = rnd(), y = 0;
+      for (let i = 0; i < n; i++) {
+        ph += f / sr; ph -= Math.floor(ph);
+        const x = wave === 'saw' ? 2 * ph - 1 : wave === 'square' ? (ph < 0.5 ? 1 : -1) : 1 - 4 * Math.abs(ph - 0.5);
+        y += k * (x - y);
+        const tt = i / sr;
+        const e = Math.min(1, tt / 0.005) * (tt > d ? Math.exp(-(tt - d) / (rel / 4)) : 1);
+        out[s0 + i] += y * e * peak;
+      }
+    };
+    const bass = (t, m, d) => tone(t, m, d, 'saw', 0.32, 480);
+    const leadN = (t, m, d, v = 1) => { tone(t, m, d, 'square', 0.1 * v, 3000); tone(t, m + 12, d, 'tri', 0.06 * v, 5000, 5); };
+    const pad = (t, ms, d) => {
+      const s0 = Math.round(t * sr), n = Math.min(len - s0, Math.round((d + 0.4) * sr));
+      for (const m of ms) for (const dt of [-9, 9]) {
+        const f = mtof(m) * Math.pow(2, dt / 1200), k = lpK(900);
+        let ph = rnd(), y = 0;
+        for (let i = 0; i < n; i++) {
+          ph += f / sr; ph -= Math.floor(ph);
+          y += k * (2 * ph - 1 - y);
+          const tt = i / sr;
+          out[s0 + i] += y * 0.03 * Math.min(1, tt / 0.35) * (tt > d ? Math.max(0, 1 - (tt - d) / 0.4) : 1);
+        }
+      }
+    };
+
+    const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+    const roots = [45, 41, 48, 43];
+    const scale = [64, 67, 69, 72, 74, 76, 79, 81, 84];
+    const rhA = [[0, 2, 4, 6, 8, 10, 12, 14], [0, 3, 6, 8, 10, 12, 14], [0, 2, 3, 6, 8, 11, 12], [0, 4, 6, 8, 10, 14]];
+    const rhB = [[0, 1, 2, 3, 4, 6, 8, 9, 10, 11, 12, 14], [0, 2, 4, 5, 6, 8, 10, 12, 13, 14, 15], [0, 1, 2, 4, 6, 7, 8, 10, 12, 14]];
+    let si = 4;
+    const melody = (bar, rh, v) => {
+      for (let k = 0; k < rh.length; k++) {
+        const st = rh[k], nx = k + 1 < rh.length ? rh[k + 1] : 16;
+        if (k === 0) {
+          const ct = chords[bar % 4].map((m) => m % 12);
+          let bestI = si, bd = 99;
+          for (let i = 0; i < scale.length; i++) if (ct.includes(scale[i] % 12) && Math.abs(i - si) < bd) { bd = Math.abs(i - si); bestI = i; }
+          si = bestI;
+        } else {
+          si = clamp(si + [-2, -1, -1, 1, 1, 2][Math.floor(rnd() * 6)], 0, scale.length - 1);
+        }
+        leadN(T(bar, st), scale[si], (((nx - st) * spb) / 4) * 0.85, v);
+      }
+    };
+    for (let bar = 0; bar < bars; bar++) {
+      const c = bar % 4;
+      pad(T(bar, 0), chords[c], 4 * spb);
+      const intro = bar < 4, groove = bar >= 4 && bar < 12, verse = bar >= 12 && bar < 20, brk = bar >= 20 && bar < 24, drop = bar >= 24;
+      if (intro) for (let s = 0; s < 16; s += 2) hat(T(bar, s), s % 4 ? 0.6 : 0.35);
+      if (groove || verse || drop) {
+        for (let b = 0; b < 4; b++) kick(T(bar, b * 4));
+        for (const s of [2, 6, 10, 14]) bass(T(bar, s), roots[c] + 12, spb * 0.42);
+        bass(T(bar, 0), roots[c], spb * 0.4);
+      }
+      if (groove || verse) for (let s = 0; s < 16; s += 2) hat(T(bar, s), s % 4 ? 1 : 0.55);
+      if (verse || drop) { snare(T(bar, 4)); snare(T(bar, 12)); }
+      if (verse) melody(bar, rhA[Math.floor(rnd() * rhA.length)], 1);
+      if (brk) {
+        kick(T(bar, 0), 0.8);
+        leadN(T(bar, 0), scale[[5, 3, 2, 4][c]], spb * 1.9);
+        leadN(T(bar, 8), scale[[4, 2, 3, 5][c]], spb * 1.4);
+        if (bar === 23) for (let s = 8; s < 16; s++) snare(T(bar, s), 0.35 + (s - 8) * 0.08);
+      }
+      if (drop) {
+        for (let s = 0; s < 16; s++) hat(T(bar, s), s % 2 ? 0.55 : 1);
+        melody(bar, rhB[Math.floor(rnd() * rhB.length)], 1.1);
+        if (bar === bars - 1) for (let s = 8; s < 16; s++) snare(T(bar, s), 0.5 + (s - 8) * 0.06);
+      }
+      if ((bar & 3) === 3) await yieldUI();
+    }
+    kick(T(bars, 0)); crash(T(bars, 0)); pad(T(bars, 0), chords[0], 2); bass(T(bars, 0), roots[0], 1.5);
+
+    // soft clip + normalise, then encode 16-bit PCM WAV
+    let peak = 1e-9;
+    for (let i = 0; i < len; i++) { out[i] = Math.tanh(out[i] * 1.2); peak = Math.max(peak, Math.abs(out[i])); }
+    const g = 0.92 / peak;
+    const ab = new ArrayBuffer(44 + len * 2), v = new DataView(ab);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true);
+    v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, len * 2, true);
+    for (let i = 0; i < len; i++) { const s = clamp(out[i] * g, -1, 1); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+    return new Blob([ab], { type: 'audio/wav' });
+  }
+
+  // =====================================================================
+  //  Song library
+  // =====================================================================
+  let songs = [];
+  const sortSongs = () => songs.sort((a, b) => b.added - a.added);
+
+  function songRecord(feat, meta) {
+    return {
+      id: meta.id || 's' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36),
+      title: meta.title, artist: meta.artist || '',
+      duration: feat.duration, bpm: Math.round((feat.displayBpm || feat.bpm) * 10) / 10, constantTempo: feat.constant,
+      beats: feat.beatT.filter((t) => t >= 0 && t <= feat.duration).map((t) => Math.round(t * 1000)),
+      charts: buildAllCharts(feat, hashStr(meta.title + '|' + Math.round(feat.duration * 1000))),
+      ver: ANALYZER_VER, added: meta.added || Date.now(), best: meta.best || {},
+      fileName: meta.fileName || '', size: meta.size || 0,
+    };
+  }
+
+  function queueItem(name) {
+    const el = document.createElement('div');
+    el.className = 'q';
+    el.innerHTML = `<div class="q-top"><div class="q-name"></div><div class="q-msg">대기 중</div></div><div class="q-bar"><i></i></div>`;
+    el.querySelector('.q-name').textContent = name;
+    $('#queue').appendChild(el);
+    return {
+      set(msg, p) { el.querySelector('.q-msg').textContent = msg; if (p != null) el.querySelector('.q-bar i').style.width = `${Math.round(p * 100)}%`; },
+      error(msg) { el.classList.add('err'); this.set(msg, 1); setTimeout(() => el.remove(), 7000); },
+      done() { this.set('완료!', 1); setTimeout(() => el.remove(), 1500); },
+    };
+  }
+
+  let importChain = Promise.resolve();
+  function enqueueImport(blob, name, meta = {}) {
+    const ui = queueItem(name);
+    importChain = importChain.then(() => importOne(blob, name, meta, ui)).catch(() => {});
+    return importChain;
+  }
+
+  async function importOne(blob, name, meta, ui) {
+    try {
+      if (blob.size > 100 * 1024 * 1024) throw new Error('파일이 너무 큽니다 (최대 100MB)');
+      ui.set('읽는 중...', 0.02);
+      const ab = await new Response(blob).arrayBuffer();
+      const tags = readID3(new Uint8Array(ab));
+      ui.set('디코딩 중...', 0.06);
+      let buf;
+      try { buf = await decodeAudio(ab); } catch (e) { throw new Error('지원하지 않거나 손상된 오디오 파일입니다'); }
+      if (buf.duration < 8) throw new Error('곡이 너무 짧습니다 (8초 이상)');
+      if (buf.duration > 15 * 60) throw new Error('곡이 너무 깁니다 (15분 이하)');
+      const feat = await analyzeBuffer(buf, (p) => ui.set(`리듬 분석 중 ${Math.round(p * 100)}%`, p));
+      ui.set('타일 생성 중...', 0.95);
+      await yieldUI();
+      const title = (meta.title || tags.title || name.replace(/\.[^.]+$/, '') || '제목 없음').slice(0, 120);
+      const rec = songRecord(feat, { title, artist: meta.artist || tags.artist || '', fileName: name, size: blob.size });
+      ui.set('저장 중...', 0.98);
+      try { await DB.putAudio(rec.id, blob); await DB.putSong(rec); } catch (e) { throw new Error('저장 공간이 부족합니다'); }
+      cacheBuffer(rec.id, buf);
+      songs.push(rec); sortSongs(); renderSongs();
+      ui.done();
+    } catch (e) {
+      console.error(e);
+      ui.error(e && e.message ? e.message : '처리 중 오류가 발생했습니다');
+    }
+  }
+
+  function renderSongs() {
+    const list = $('#songs');
+    list.innerHTML = '';
+    $('#empty').classList.toggle('hidden', songs.length > 0);
+    $('#songCount').textContent = songs.length ? `${songs.length}곡` : '';
+    for (const s of songs) {
+      const el = document.createElement('div');
+      el.className = 'song';
+      const hue = hashStr(s.title) % 360;
+      el.innerHTML = `
+        <div class="song-top">
+          <div class="song-art" style="--h:${hue}">♪</div>
+          <div class="song-info">
+            <div class="song-title">${esc(s.title)}</div>
+            <div class="song-meta">${s.artist ? esc(s.artist) + ' · ' : ''}${fmtTime(s.duration)} · ${Math.round(s.bpm)} BPM</div>
+          </div>
+          <div class="song-actions">
+            <button class="mini" data-act="rename" title="이름 변경" aria-label="이름 변경">✎</button>
+            <button class="mini" data-act="del" title="삭제" aria-label="삭제">✕</button>
+          </div>
+        </div>
+        <div class="diffs">${DIFFS.map((d) => {
+          const c = s.charts[d.key] || { level: '-', notes: [] };
+          const b = s.best && s.best[d.key];
+          return `<button class="diff" data-diff="${d.key}" style="--c:${d.color}" title="${d.ko} · 노트 ${c.notes.length}개">
+            <span class="dn">${d.name}</span><span class="dl">Lv.${c.level}</span>
+            <span class="db">${b ? `${b.rank} · ${b.acc.toFixed(1)}%` : `${c.notes.length} 노트`}</span></button>`;
+        }).join('')}</div>`;
+      el.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.diff) { startGame(s, btn.dataset.diff); return; }
+        if (btn.dataset.act === 'rename') {
+          const t = prompt('곡 이름', s.title);
+          if (t && t.trim()) { s.title = t.trim().slice(0, 120); await DB.putSong(s); renderSongs(); }
+        } else if (btn.dataset.act === 'del') {
+          if (confirm(`"${s.title}" 을(를) 삭제할까요?`)) {
+            await DB.del(s.id); decodedCache.delete(s.id);
+            songs = songs.filter((x) => x.id !== s.id); renderSongs();
+          }
+        }
+      });
+      list.appendChild(el);
+    }
+  }
+
+  // =====================================================================
+  //  Game
+  // =====================================================================
+  const JW = { perfect: 0.045, great: 0.09, good: 0.135 };
+  const JWEIGHT = { perfect: 1, great: 0.7, good: 0.35, miss: 0 };
+  const JCOLOR = { perfect: '#ffe66d', great: '#41e2ff', good: '#7dff8a', miss: '#ff5470' };
+  const JTEXT = { perfect: 'PERFECT', great: 'GREAT', good: 'GOOD', miss: 'MISS' };
+  const LANE_COLORS = ['#41e2ff', '#ff4fd8', '#ff4fd8', '#41e2ff'];
+
+  const cv = $('#cv'), cx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, LY = {}, sprites = [];
+  const game = { active: false };
+
+  function mix(hex, other, t) {
+    const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const a = p(hex), b = p(other);
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+  }
+  function rrect(g, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    g.beginPath();
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+  function makeSprite(color, w, h) {
+    const pad = 12, c = document.createElement('canvas');
+    c.width = Math.ceil((w + pad * 2) * DPR); c.height = Math.ceil((h + pad * 2) * DPR);
+    const g = c.getContext('2d');
+    g.scale(DPR, DPR);
+    g.shadowColor = color; g.shadowBlur = 14;
+    const grd = g.createLinearGradient(0, pad, 0, pad + h);
+    grd.addColorStop(0, mix(color, '#ffffff', 0.55)); grd.addColorStop(0.45, color); grd.addColorStop(1, mix(color, '#000000', 0.35));
+    g.fillStyle = grd; rrect(g, pad, pad, w, h, 7); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = 'rgba(255,255,255,0.8)'; rrect(g, pad + 6, pad + 3, w - 12, 2.5, 1.2); g.fill();
+    return { c, pad, w, h };
+  }
+  function layout() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const laneW = Math.floor(Math.min(104, (W - 24) / 4));
+    const fieldW = laneW * 4, fieldX = Math.round((W - fieldW) / 2);
+    const judgeY = Math.round(H - Math.max(92, H * 0.15));
+    const noteH = Math.round(clamp(laneW * 0.22, 15, 24));
+    LY = { laneW, fieldW, fieldX, judgeY, noteH };
+    sprites = LANE_COLORS.map((c) => makeSprite(c, laneW - 10, noteH));
+    sprites.gray = makeSprite('#6b7086', laneW - 10, noteH);
+  }
+  window.addEventListener('resize', () => { if (game.active) layout(); });
+
+  // ---- timing: song time from the audio clock, interpolated with performance.now()
+  function ctxTimeAt(perf) {
+    const c = audioCtx;
+    if (c.getOutputTimestamp) {
+      const ts = c.getOutputTimestamp();
+      if (ts && ts.contextTime > 0 && ts.performanceTime > 0) return ts.contextTime + clamp((perf - ts.performanceTime) / 1000, -0.25, 0.1);
+    }
+    return c.currentTime - (c.outputLatency || c.baseLatency || 0);
+  }
+  const songTimeAt = (perf) => ctxTimeAt(perf) - game.t0 - settings.offset / 1000;
+  const evTime = (e) => (e && e.timeStamp > 0 && Math.abs(e.timeStamp - performance.now()) < 1000 ? e.timeStamp : performance.now());
+
+  let starting = false;
+  async function startGame(song, diffKey) {
+    if (starting || game.active) return;
+    starting = true;
+    const ctx = getCtx();
+    const resumeP = ctx.resume(); // must be triggered inside the user gesture
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    showLoading('곡 불러오는 중...');
+    try {
+      await resumeP;
+      const buf = await getSongBuffer(song);
+      if (song.ver !== ANALYZER_VER) {
+        showLoading('채보 다시 만드는 중...');
+        const feat = await analyzeBuffer(buf, (p) => showLoading(`채보 다시 만드는 중... ${Math.round(p * 100)}%`));
+        Object.assign(song, songRecord(feat, song), { id: song.id, title: song.title, artist: song.artist });
+        await DB.putSong(song);
+        renderSongs();
+      }
+      hideLoading();
+      beginPlay(song, diffKey, buf);
+    } catch (e) {
+      console.error(e);
+      hideLoading();
+      toast('곡을 불러오지 못했습니다: ' + (e.message || e));
+    } finally {
+      starting = false;
+    }
+  }
+
+  function beginPlay(song, diffKey, buf) {
+    const ctx = getCtx();
+    const cfg = DIFF_BY_KEY[diffKey];
+    const chart = song.charts[diffKey];
+    stopAudio();
+    const notes = chart.notes.map(([t, lane, d]) => ({
+      t: t / 1000, lane, dur: d / 1000, end: (t + d) / 1000, hit: false, done: false, holding: false, missed: false,
+    }));
+    const lanes = [[], [], [], []];
+    for (const n of notes) lanes[n.lane].push(n);
+    const travel = 2.0 / settings.speed;
+    const firstT = notes.length ? notes[0].t : 0;
+    let lastEnd = 0;
+    for (const n of notes) lastEnd = Math.max(lastEnd, n.end);
+    const leadIn = Math.max(1.6, travel + 0.8 - firstT);
+
+    Object.assign(game, {
+      active: true, paused: false, finished: false, failed: false, song, diffKey, cfg, buf,
+      notes, lanes, ptr: [0, 0, 0, 0], drawFrom: 0, holding: [null, null, null, null],
+      inCount: [0, 0, 0, 0], pressAt: [-1e9, -1e9, -1e9, -1e9], releaseAt: [-1e9, -1e9, -1e9, -1e9],
+      keysDown: new Set(), pointers: new Map(),
+      total: Math.max(1, chart.total || notes.length), judged: 0, sumW: 0, score: 0, combo: 0, maxCombo: 0,
+      counts: { perfect: 0, great: 0, good: 0, miss: 0 }, early: 0, late: 0,
+      gauge: 100, missDmg: cfg.missDmg, noFail: settings.noFail, auto: settings.auto,
+      travel, duration: buf.duration, endT: notes.length ? Math.min(buf.duration + 0.2, lastEnd + 2.2) : buf.duration,
+      beats: (song.beats || []).map((b) => b / 1000), beatPtr: 0,
+      fx: [], parts: [], jfx: null, comboAt: 0, lastT: -1e9, lastNow: performance.now(), failT: 0, sparkAt: [0, 0, 0, 0],
+      touch: game.touch || (window.matchMedia && matchMedia('(pointer: coarse)').matches),
+    });
+
+    // audio graph
+    const gain = ctx.createGain();
+    gain.gain.value = Math.pow(settings.volume / 100, 1.6);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.75;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(gain); gain.connect(analyser); analyser.connect(ctx.destination);
+    const startAt = ctx.currentTime + 0.1 + leadIn;
+    src.start(startAt);
+    Object.assign(game, { src, gain, analyser, freq: new Uint8Array(analyser.frequencyBinCount), t0: startAt });
+
+    $('#menu').classList.add('hidden');
+    $('#result').classList.add('hidden');
+    $('#pause').classList.add('hidden');
+    $('#game').classList.remove('hidden');
+    layout();
+    cancelAnimationFrame(game.raf);
+    game.raf = requestAnimationFrame(loop);
+  }
+
+  function stopAudio() {
+    if (game.src) {
+      try { game.src.stop(); } catch (e) { /* already stopped */ }
+      try { game.src.disconnect(); game.gain.disconnect(); game.analyser.disconnect(); } catch (e) { /* ignore */ }
+      game.src = null;
+    }
+  }
+
+  function exitToMenu() {
+    game.active = false;
+    cancelAnimationFrame(game.raf);
+    stopAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    $('#game').classList.add('hidden');
+    $('#pause').classList.add('hidden');
+    $('#result').classList.add('hidden');
+    $('#menu').classList.remove('hidden');
+    renderSongs();
+  }
+
+  function restart() {
+    if (!game.song) return;
+    const { song, diffKey, buf } = game;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    beginPlay(song, diffKey, buf);
+  }
+
+  function pauseGame() {
+    if (!game.active || game.paused || game.finished) return;
+    game.paused = true;
+    audioCtx.suspend();
+    game.keysDown.clear(); game.pointers.clear(); game.inCount = [0, 0, 0, 0];
+    $('#pause').classList.remove('hidden');
+  }
+  function resumeGame() {
+    if (!game.paused) return;
+    game.paused = false;
+    $('#pause').classList.add('hidden');
+    audioCtx.resume();
+  }
+
+  // ---- judgement
+  function applyJudge(kind, lane, dt) {
+    const g = game, now = performance.now();
+    g.counts[kind]++; g.judged++;
+    g.sumW += JWEIGHT[kind];
+    if (kind === 'miss') { g.combo = 0; g.gauge -= g.missDmg; }
+    else {
+      g.combo++; g.maxCombo = Math.max(g.maxCombo, g.combo);
+      g.gauge += kind === 'perfect' ? 1 : kind === 'great' ? 0.6 : 0;
+      if (dt != null && kind !== 'perfect') { if (dt < 0) g.early++; else g.late++; }
+      spawnHit(lane, kind, now);
+    }
+    g.gauge = clamp(g.gauge, 0, 100);
+    g.score = Math.round((1e6 * g.sumW) / g.total);
+    g.jfx = { kind, at: now, dt: kind === 'perfect' || kind === 'miss' ? null : dt };
+    g.comboAt = now;
+    if (g.gauge <= 0 && !g.noFail && !g.auto && !g.finished) failGame();
+  }
+
+  function press(lane, perf) {
+    const g = game;
+    g.pressAt[lane] = performance.now();
+    if (g.auto || g.finished || g.paused) return;
+    const t = songTimeAt(perf);
+    const arr = g.lanes[lane];
+    let p = g.ptr[lane];
+    while (p < arr.length && arr[p].hit) p++;
+    const n = arr[p];
+    if (!n) return;
+    const dt = t - n.t, ad = Math.abs(dt);
+    if (ad > JW.good) return;
+    n.hit = true;
+    applyJudge(ad <= JW.perfect ? 'perfect' : ad <= JW.great ? 'great' : 'good', lane, dt);
+    if (n.dur > 0) { n.holding = true; g.holding[lane] = n; } else n.done = true;
+  }
+  function release(lane, perf) {
+    const g = game;
+    g.releaseAt[lane] = performance.now();
+    const h = g.holding[lane];
+    if (!h || g.auto || g.finished) return;
+    const t = songTimeAt(perf);
+    g.holding[lane] = null; h.holding = false; h.done = true;
+    if (t >= h.end - 0.16) applyJudge('perfect', lane, null);
+    else { h.broken = true; applyJudge('miss', lane, null); }
+  }
+  function inputDown(lane, perf) { if (++game.inCount[lane] === 1) press(lane, perf); }
+  function inputUp(lane, perf) { if (game.inCount[lane] > 0 && --game.inCount[lane] === 0) release(lane, perf); }
+
+  function update(t, now) {
+    const g = game;
+    if (g.auto) {
+      for (let l = 0; l < 4; l++) {
+        const arr = g.lanes[l];
+        let p = g.ptr[l];
+        while (p < arr.length && arr[p].hit) p++;
+        const n = arr[p];
+        if (n && t >= n.t) {
+          n.hit = true; g.pressAt[l] = now; g.releaseAt[l] = now + (n.dur ? n.dur * 1000 : 70);
+          applyJudge('perfect', l, 0);
+          if (n.dur > 0) { n.holding = true; g.holding[l] = n; } else n.done = true;
+        }
+      }
+    }
+    for (let l = 0; l < 4; l++) {
+      const arr = g.lanes[l];
+      let p = g.ptr[l];
+      while (p < arr.length) {
+        const n = arr[p];
+        if (n.hit) { p++; continue; }
+        if (t - n.t > JW.good) {
+          n.hit = n.done = n.missed = true;
+          applyJudge('miss', l, null);
+          if (n.dur > 0) applyJudge('miss', l, null);
+          if (g.finished) return;
+          p++; continue;
+        }
+        break;
+      }
+      g.ptr[l] = p;
+      const h = g.holding[l];
+      if (h && t >= h.end) { g.holding[l] = null; h.holding = false; h.done = true; applyJudge('perfect', l, null); }
+      else if (h && now - g.sparkAt[l] > 55) { g.sparkAt[l] = now; spawnSpark(l); }
+    }
+    if (!g.finished && t >= g.endT) finishGame();
+  }
+
+  function finishGame() {
+    const g = game;
+    g.finished = true;
+    const ctx = audioCtx;
+    try { g.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.25); } catch (e) { /* ignore */ }
+    setTimeout(() => { if (game === g && g.active) { stopAudio(); showResult(false); } }, 1100);
+  }
+  function failGame() {
+    const g = game;
+    g.finished = true; g.failed = true; g.failT = g.lastT; g.failAt = performance.now();
+    const ctx = audioCtx, now = ctx.currentTime;
+    try {
+      g.src.playbackRate.setValueAtTime(1, now);
+      g.src.playbackRate.linearRampToValueAtTime(0.05, now + 1.4);
+      g.gain.gain.setValueAtTime(g.gain.gain.value, now);
+      g.gain.gain.linearRampToValueAtTime(0, now + 1.5);
+    } catch (e) { /* ignore */ }
+    setTimeout(() => { if (game === g && g.active) { stopAudio(); showResult(true); } }, 1900);
+  }
+
+  function rankOf(acc) {
+    return acc >= 98 ? 'S+' : acc >= 95 ? 'S' : acc >= 90 ? 'A' : acc >= 80 ? 'B' : acc >= 70 ? 'C' : 'D';
+  }
+  const RANK_COLOR = { 'S+': '#ffe66d', S: '#ffd84d', A: '#41e2ff', B: '#7dff8a', C: '#fb923c', D: '#a3a8c3', F: '#ff5470' };
+
+  async function showResult(failed) {
+    const g = game, cfg = g.cfg;
+    const acc = (100 * g.sumW) / g.total;
+    const rank = failed ? 'F' : rankOf(acc);
+    const fc = !failed && g.counts.miss === 0;
+    const ap = fc && g.counts.great === 0 && g.counts.good === 0;
+    $('#resTitle').textContent = g.song.title;
+    $('#resDiff').textContent = `${cfg.name} · Lv.${g.song.charts[g.diffKey].level}${g.auto ? ' · AUTO' : ''}`;
+    $('#resDiff').style.color = cfg.color;
+    const rk = $('#resRank');
+    rk.textContent = rank; rk.style.color = RANK_COLOR[rank];
+    $('#resFlag').textContent = failed ? 'FAILED' : ap ? 'ALL PERFECT' : fc ? 'FULL COMBO' : 'CLEAR';
+    $('#resFlag').style.color = failed ? '#ff5470' : ap || fc ? 'var(--gold)' : 'var(--muted)';
+    $('#resScore').textContent = String(g.score).padStart(7, '0');
+    const cells = [
+      ['PERFECT', g.counts.perfect, JCOLOR.perfect], ['GREAT', g.counts.great, JCOLOR.great],
+      ['GOOD', g.counts.good, JCOLOR.good], ['MISS', g.counts.miss, JCOLOR.miss],
+      ['MAX COMBO', g.maxCombo, '#fff'], ['정확도', acc.toFixed(2) + '%', '#fff'],
+      ['EARLY', g.early, '#9fb4ff'], ['LATE', g.late, '#ffb59f'],
+    ];
+    $('#resGrid').innerHTML = cells.map(([k, v, c]) => `<div><span style="color:${c}">${k}</span><b>${v}</b></div>`).join('');
+    let isNew = false;
+    if (!failed && !g.auto) {
+      const prev = g.song.best && g.song.best[g.diffKey];
+      if (!prev || g.score > prev.score) {
+        isNew = true;
+        g.song.best = g.song.best || {};
+        g.song.best[g.diffKey] = { score: g.score, acc, rank, fc, ap, at: Date.now() };
+        try { await DB.putSong(g.song); } catch (e) { /* ignore */ }
+      }
+    }
+    $('#resNew').textContent = isNew ? 'NEW RECORD!' : g.auto ? '오토 플레이는 기록되지 않습니다' : '';
+    $('#result').classList.remove('hidden');
+  }
+
+  // ---- effects
+  function laneX(l) { return LY.fieldX + l * LY.laneW; }
+  function spawnHit(lane, kind, now) {
+    const g = game;
+    g.fx.push({ lane, kind, at: now });
+    if (g.fx.length > 40) g.fx.shift();
+    const x = laneX(lane) + LY.laneW / 2, y = LY.judgeY;
+    const n = kind === 'perfect' ? 10 : 6;
+    for (let i = 0; i < n && g.parts.length < 320; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, sp = 120 + Math.random() * 280;
+      g.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.35 + Math.random() * 0.25, age: 0, c: kind === 'perfect' ? '#fff3b0' : LANE_COLORS[lane] });
+    }
+  }
+  function spawnSpark(lane) {
+    const g = game;
+    if (g.parts.length > 320) return;
+    const x = laneX(lane) + LY.laneW / 2 + (Math.random() - 0.5) * LY.laneW * 0.5;
+    g.parts.push({ x, y: LY.judgeY, vx: (Math.random() - 0.5) * 60, vy: -160 - Math.random() * 160, life: 0.3 + Math.random() * 0.2, age: 0, c: LANE_COLORS[lane] });
+  }
+
+  // ---- main loop
+  function loop(now) {
+    if (!game.active) return;
+    game.raf = requestAnimationFrame(loop);
+    if (game.paused) return;
+    let t = game.failed ? game.failT : songTimeAt(now);
+    if (t < game.lastT) t = game.lastT;
+    game.lastT = t;
+    const dt = Math.min(0.05, (now - game.lastNow) / 1000);
+    game.lastNow = now;
+    if (!game.finished) update(t, now);
+    draw(t, now, dt);
+  }
+
+  function draw(t, now, dt) {
+    const g = game, { laneW, fieldW, fieldX, judgeY, noteH } = LY;
+    const c = cx, color = g.cfg.color;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // beat pulse
+    while (g.beatPtr + 1 < g.beats.length && g.beats[g.beatPtr + 1] <= t) g.beatPtr++;
+    const lb = g.beats[g.beatPtr];
+    const pulse = lb != null && t >= lb && t >= 0 ? Math.exp(-(t - lb) * 7) : 0;
+
+    // background
+    c.fillStyle = '#05060d'; c.fillRect(0, 0, W, H);
+    const bg = c.createRadialGradient(W / 2, H * 0.1, 0, W / 2, H * 0.1, Math.max(W, H) * 0.9);
+    bg.addColorStop(0, mix(color, '#05060d', 0.78 - pulse * 0.12));
+    bg.addColorStop(1, '#05060d');
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+
+    // spectrum
+    if (g.analyser && !g.failed) {
+      g.analyser.getByteFrequencyData(g.freq);
+      const bars = Math.max(24, Math.min(64, Math.round(W / 22))), bw = W / bars;
+      const sg = c.createLinearGradient(0, H, 0, H * 0.55);
+      sg.addColorStop(0, color); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = sg; c.globalAlpha = 0.3;
+      for (let i = 0; i < bars; i++) {
+        const k = Math.floor(2 + Math.pow(i / bars, 1.6) * 150);
+        const v = (g.freq[k] / 255) * (0.55 + 0.6 * (i / bars));
+        const h = v * v * H * 0.4;
+        c.fillRect(i * bw + bw * 0.2, H - h, bw * 0.6, h);
+      }
+      c.globalAlpha = 1;
+    }
+
+    // field
+    c.fillStyle = 'rgba(6,8,18,0.86)'; c.fillRect(fieldX, 0, fieldW, H);
+    for (let l = 0; l < 4; l++) {
+      const x = laneX(l);
+      // key beam
+      const down = g.inCount[l] > 0 || (g.auto && now < g.releaseAt[l]) || g.holding[l];
+      const a = down ? 1 : clamp(1 - (now - Math.max(g.releaseAt[l], g.pressAt[l])) / 180, 0, 1);
+      if (a > 0) {
+        const bm = c.createLinearGradient(0, judgeY, 0, judgeY - H * 0.5);
+        bm.addColorStop(0, LANE_COLORS[l]); bm.addColorStop(1, 'rgba(0,0,0,0)');
+        c.globalAlpha = 0.28 * a; c.fillStyle = bm; c.fillRect(x, judgeY - H * 0.5, laneW, H * 0.5);
+        c.globalAlpha = 1;
+      }
+    }
+    c.fillStyle = 'rgba(255,255,255,0.07)';
+    for (let l = 0; l <= 4; l++) c.fillRect(fieldX + l * laneW - (l === 0 || l === 4 ? 1 : 0.5), 0, l === 0 || l === 4 ? 2 : 1, H);
+
+    // judge line + receptors
+    c.fillStyle = mix(color, '#ffffff', 0.5);
+    c.globalAlpha = 0.55 + pulse * 0.45;
+    c.fillRect(fieldX, judgeY - 1.5, fieldW, 3);
+    c.globalAlpha = 1;
+    for (let l = 0; l < 4; l++) {
+      const x = laneX(l) + 5, down = g.inCount[l] > 0 || (g.auto && now < g.releaseAt[l]);
+      c.lineWidth = 2; c.strokeStyle = down ? LANE_COLORS[l] : 'rgba(255,255,255,0.22)';
+      rrect(c, x, judgeY - noteH / 2, laneW - 10, noteH, 7); c.stroke();
+      if (down) { c.globalAlpha = 0.35; c.fillStyle = LANE_COLORS[l]; c.fill(); c.globalAlpha = 1; }
+    }
+    if (!g.auto && !g.touch) {
+      c.font = `700 ${Math.round(clamp(laneW * 0.16, 11, 15))}px 'Segoe UI','Malgun Gothic',sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,0.35)';
+      for (let l = 0; l < 4; l++) c.fillText(keyLabel(settings.keys[l]), laneX(l) + laneW / 2, judgeY + noteH + 14);
+    }
+
+    // combo (behind the notes)
+    const font = (w, s) => `${w} ${Math.round(s)}px 'Segoe UI','Malgun Gothic',sans-serif`;
+    const cxm = fieldX + fieldW / 2;
+    if (g.combo >= 2) {
+      const bump = 1 + 0.25 * Math.max(0, 1 - (now - g.comboAt) / 120);
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.font = font(900, clamp(laneW * 0.55, 30, 54) * bump);
+      c.fillStyle = 'rgba(255,255,255,0.85)';
+      c.fillText(String(g.combo), cxm, H * 0.34);
+      c.font = font(800, 12); c.fillStyle = color;
+      c.fillText('C O M B O', cxm, H * 0.34 + 20);
+    }
+
+    // notes
+    const pxs = judgeY / g.travel;
+    const yOf = (time) => judgeY - (time - t) * pxs;
+    const notes = g.notes;
+    for (let i = g.drawFrom; i < notes.length; i++) {
+      const n = notes[i];
+      if (n.t - t > g.travel + 0.15) break;
+      const yEnd = yOf(n.end);
+      const gone = n.done && (!n.missed || yEnd - noteH > H);
+      if (gone) { if (i === g.drawFrom) g.drawFrom++; continue; }
+      if (n.done && !n.missed) continue;
+      const x = laneX(n.lane) + 5, w = laneW - 10;
+      const spr = n.missed || n.broken ? sprites.gray : sprites[n.lane];
+      c.globalAlpha = n.missed ? 0.4 : 1;
+      if (n.dur > 0) {
+        const yHead = n.holding ? judgeY : yOf(n.t);
+        const top = Math.max(-noteH, yEnd);
+        if (yHead > top) {
+          c.fillStyle = n.missed ? '#4a4e63' : LANE_COLORS[n.lane];
+          c.globalAlpha = n.missed ? 0.25 : n.holding ? 0.55 + 0.15 * Math.sin(now / 60) : 0.38;
+          c.fillRect(x + w * 0.16, top, w * 0.68, yHead - top);
+          c.globalAlpha = n.missed ? 0.4 : 0.9;
+          c.fillRect(x + w * 0.16, top - 3, w * 0.68, 6);
+        }
+        c.globalAlpha = n.missed ? 0.4 : 1;
+        c.drawImage(spr.c, x - spr.pad, yHead - noteH / 2 - spr.pad, w + spr.pad * 2, noteH + spr.pad * 2);
+      } else {
+        const y = yOf(n.t);
+        c.drawImage(spr.c, x - spr.pad, y - noteH / 2 - spr.pad, w + spr.pad * 2, noteH + spr.pad * 2);
+      }
+      c.globalAlpha = 1;
+    }
+
+    // hit bursts
+    c.globalCompositeOperation = 'lighter';
+    for (let i = g.fx.length - 1; i >= 0; i--) {
+      const f = g.fx[i], age = (now - f.at) / 1000;
+      if (age > 0.32) { g.fx.splice(i, 1); continue; }
+      const k = age / 0.32, cxp = laneX(f.lane) + laneW / 2;
+      c.globalAlpha = 1 - k;
+      c.strokeStyle = JCOLOR[f.kind]; c.lineWidth = 3 * (1 - k) + 1;
+      c.beginPath(); c.arc(cxp, judgeY, laneW * (0.22 + 0.45 * k), 0, Math.PI * 2); c.stroke();
+      c.fillStyle = LANE_COLORS[f.lane]; c.globalAlpha = 0.45 * (1 - k);
+      c.fillRect(laneX(f.lane) + 2, judgeY - noteH, laneW - 4, noteH * 2);
+    }
+    for (let i = g.parts.length - 1; i >= 0; i--) {
+      const p = g.parts[i];
+      p.age += dt;
+      if (p.age > p.life) { g.parts.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt;
+      c.globalAlpha = 1 - p.age / p.life; c.fillStyle = p.c;
+      c.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+
+    // HUD
+    c.textBaseline = 'alphabetic';
+    // progress
+    c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(0, 0, W, 3);
+    c.fillStyle = color; c.fillRect(0, 0, W * clamp(t / g.duration, 0, 1), 3);
+    // title + difficulty
+    c.textAlign = 'left';
+    c.font = font(700, 14); c.fillStyle = '#fff';
+    const titleMax = Math.max(60, W - 64 - 150);
+    let title = g.song.title;
+    if (c.measureText(title).width > titleMax) {
+      while (title.length > 1 && c.measureText(title + '…').width > titleMax) title = title.slice(0, -1);
+      title += '…';
+    }
+    c.fillText(title, 62, 26);
+    c.font = font(800, 12); c.fillStyle = color;
+    c.fillText(`${g.cfg.name}  Lv.${g.song.charts[g.diffKey].level}${g.auto ? '  · AUTO' : ''}`, 62, 44);
+    // score + accuracy
+    c.textAlign = 'right';
+    c.font = font(900, 26); c.fillStyle = '#fff';
+    c.fillText(String(g.score).padStart(7, '0'), W - 14, 34);
+    c.font = font(700, 13); c.fillStyle = 'rgba(255,255,255,0.65)';
+    const acc = g.judged ? (100 * g.sumW) / g.judged : 100;
+    c.fillText(acc.toFixed(2) + '%', W - 14, 52);
+    // gauge
+    const margin = W - fieldX - fieldW;
+    const gx = margin >= 20 ? fieldX + fieldW + 6 : margin >= 9 ? fieldX + fieldW + 2 : fieldX + fieldW - 7;
+    const gTop = H * 0.2, gH = judgeY - gTop;
+    c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(gx, gTop, 5, gH);
+    const gv = g.gauge / 100;
+    c.fillStyle = gv > 0.5 ? '#4ade80' : gv > 0.25 ? '#facc15' : '#f43f5e';
+    c.fillRect(gx, gTop + gH * (1 - gv), 5, gH * gv);
+
+    c.textAlign = 'center';
+    // judgement
+    if (g.jfx) {
+      const age = (now - g.jfx.at) / 1000;
+      if (age < 0.5) {
+        const s = 1 + 0.3 * Math.max(0, 1 - age / 0.08);
+        c.globalAlpha = clamp(1.6 - age * 3.2, 0, 1);
+        c.font = font(900, clamp(laneW * 0.32, 20, 32) * s);
+        c.fillStyle = JCOLOR[g.jfx.kind];
+        c.fillText(JTEXT[g.jfx.kind], cxm, H * 0.46);
+        if (g.jfx.dt != null) {
+          c.font = font(800, 12);
+          c.fillStyle = g.jfx.dt < 0 ? '#9fb4ff' : '#ffb59f';
+          c.fillText(g.jfx.dt < 0 ? 'EARLY' : 'LATE', cxm, H * 0.46 + 20);
+        }
+        c.globalAlpha = 1;
+      }
+    }
+    // ready / go
+    if (t < 0.4) {
+      const txt = t < -0.45 ? 'READY' : 'GO!';
+      c.font = font(900, 40); c.fillStyle = '#fff';
+      c.globalAlpha = t < -0.45 ? 0.6 + 0.4 * Math.sin(now / 120) : clamp(1 - (t + 0.45) / 0.85, 0, 1);
+      c.fillText(txt, cxm, H * 0.4);
+      c.globalAlpha = 1;
+    }
+    if (g.failed) {
+      const k = clamp((now - g.failAt) / 600, 0, 1);
+      c.fillStyle = `rgba(30,0,8,${0.55 * k})`; c.fillRect(0, 0, W, H);
+      c.font = font(900, 46); c.fillStyle = '#ff5470'; c.globalAlpha = k;
+      c.fillText('FAILED', W / 2, H * 0.45);
+      c.globalAlpha = 1;
+    }
+  }
+
+  // ---- input
+  window.addEventListener('keydown', (e) => {
+    if (waitingKey !== null) return;
+    if (!game.active) return;
+    if (!$('#result').classList.contains('hidden')) {
+      if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); restart(); }
+      else if (e.code === 'Escape') exitToMenu();
+      return;
+    }
+    if (e.code === 'Escape') { e.preventDefault(); if (game.paused) resumeGame(); else pauseGame(); return; }
+    const lane = settings.keys.indexOf(e.code);
+    if (lane < 0 || game.paused) return;
+    e.preventDefault();
+    if (e.repeat || game.keysDown.has(e.code)) return;
+    game.keysDown.add(e.code);
+    inputDown(lane, evTime(e));
+  });
+  window.addEventListener('keyup', (e) => {
+    if (!game.active) return;
+    const lane = settings.keys.indexOf(e.code);
+    if (lane < 0 || !game.keysDown.has(e.code)) return;
+    game.keysDown.delete(e.code);
+    inputUp(lane, evTime(e));
+  });
+  const laneAt = (x) => {
+    const l = Math.floor((x - LY.fieldX) / LY.laneW);
+    if (l >= 0 && l < 4) return l;
+    if (x < LY.fieldX && x > LY.fieldX - LY.laneW) return 0;
+    if (x >= LY.fieldX + LY.fieldW && x < LY.fieldX + LY.fieldW + LY.laneW) return 3;
+    return -1;
+  };
+  cv.addEventListener('pointerdown', (e) => {
+    if (!game.active || game.paused) return;
+    e.preventDefault();
+    if (e.pointerType === 'touch') game.touch = true;
+    const lane = laneAt(e.clientX);
+    if (lane < 0) return;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    game.pointers.set(e.pointerId, lane);
+    inputDown(lane, evTime(e));
+  });
+  const ptrUp = (e) => {
+    if (!game.active || !game.pointers.has(e.pointerId)) return;
+    const lane = game.pointers.get(e.pointerId);
+    game.pointers.delete(e.pointerId);
+    inputUp(lane, evTime(e));
+  };
+  cv.addEventListener('pointerup', ptrUp);
+  cv.addEventListener('pointercancel', ptrUp);
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+  window.addEventListener('blur', () => pauseGame());
+
+  $('#pauseBtn').addEventListener('click', () => pauseGame());
+  $('#resumeBtn').addEventListener('click', () => resumeGame());
+  $('#restartBtn').addEventListener('click', () => { game.paused = false; $('#pause').classList.add('hidden'); restart(); });
+  $('#quitBtn').addEventListener('click', () => exitToMenu());
+  $('#resRetry').addEventListener('click', () => restart());
+  $('#resBack').addEventListener('click', () => exitToMenu());
+
+  // =====================================================================
+  //  Menu wiring
+  // =====================================================================
+  const drop = $('#drop'), fileInput = $('#fileInput');
+  fileInput.addEventListener('change', () => {
+    getCtx();
+    for (const f of fileInput.files) enqueueImport(f, f.name);
+    fileInput.value = '';
+  });
+  // files can be dropped anywhere on the song select screen
+  const menuOpen = () => !game.active && $('#settings').classList.contains('hidden');
+  window.addEventListener('dragover', (e) => { e.preventDefault(); if (menuOpen()) drop.classList.add('over'); });
+  window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) drop.classList.remove('over'); });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    if (!menuOpen()) return;
+    getCtx();
+    const files = [...(e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : [])];
+    const audio = files.filter((f) => /^audio\//.test(f.type) || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(f.name));
+    if (!audio.length) { toast('오디오 파일(MP3 등)을 올려 주세요'); return; }
+    audio.forEach((f) => enqueueImport(f, f.name));
+  });
+
+  $('#demoBtn').addEventListener('click', async () => {
+    getCtx();
+    const btn = $('#demoBtn');
+    btn.disabled = true;
+    try {
+      const blob = await synthDemo();
+      await enqueueImport(blob, 'Neon Pulse (데모).wav', { title: 'Neon Pulse (데모 곡)', artist: 'Beat Tiles' });
+    } finally { btn.disabled = false; }
+  });
+
+  // settings
+  let waitingKey = null;
+  function syncSettingsUI() {
+    $('#speed').value = settings.speed; $('#speedVal').textContent = `×${Number(settings.speed).toFixed(1)}`;
+    $('#offset').value = settings.offset; $('#offsetVal').textContent = `${settings.offset > 0 ? '+' : ''}${settings.offset}ms`;
+    $('#volume').value = settings.volume; $('#volVal').textContent = `${settings.volume}%`;
+    $('#noFail').checked = settings.noFail; $('#autoPlay').checked = settings.auto;
+    $('#keyBtns').innerHTML = settings.keys.map((k, i) => `<button data-k="${i}" class="${waitingKey === i ? 'wait' : ''}">${waitingKey === i ? '...' : esc(keyLabel(k))}</button>`).join('');
+    $('#keyHelp').innerHTML = settings.keys.map((k) => `<kbd>${esc(keyLabel(k))}</kbd>`).join(' ');
+  }
+  $('#speed').addEventListener('input', (e) => { settings.speed = +e.target.value; saveSettings(); syncSettingsUI(); });
+  $('#offset').addEventListener('input', (e) => { settings.offset = +e.target.value; saveSettings(); syncSettingsUI(); });
+  $('#volume').addEventListener('input', (e) => { settings.volume = +e.target.value; saveSettings(); syncSettingsUI(); });
+  $('#noFail').addEventListener('change', (e) => { settings.noFail = e.target.checked; saveSettings(); });
+  $('#autoPlay').addEventListener('change', (e) => { settings.auto = e.target.checked; saveSettings(); });
+  $('#keyBtns').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    waitingKey = +b.dataset.k; syncSettingsUI();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (waitingKey === null) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.code !== 'Escape') {
+      const other = settings.keys.indexOf(e.code);
+      if (other >= 0 && other !== waitingKey) settings.keys[other] = settings.keys[waitingKey];
+      settings.keys[waitingKey] = e.code;
+      saveSettings();
+    }
+    waitingKey = null; syncSettingsUI();
+  }, true);
+  $('#settingsBtn').addEventListener('click', () => { syncSettingsUI(); $('#settings').classList.remove('hidden'); });
+  const closeSettings = () => { waitingKey = null; $('#settings').classList.add('hidden'); syncSettingsUI(); };
+  $('#closeSettings').addEventListener('click', closeSettings);
+  $('#settings').addEventListener('click', (e) => { if (e.target.id === 'settings') closeSettings(); });
+  window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && waitingKey === null && !$('#settings').classList.contains('hidden')) closeSettings(); });
+
+  // init
+  (async () => {
+    syncSettingsUI();
+    try { songs = await DB.allSongs(); } catch (e) { songs = []; }
+    sortSongs(); renderSongs();
+    if (!(await DB.isPersistent())) $('#storageNotice').classList.remove('hidden');
+  })();
+
+  // handle for debugging / automated checks
+  window.BeatTiles = { DB, analyzeBuffer, analyzeSamples, buildAllCharts, synthDemo, game, settings: () => settings, startGame, decodeAudio, songs: () => songs, songTime: () => songTimeAt(performance.now()) };
+})();
+</script>
+</body>
+</html>
