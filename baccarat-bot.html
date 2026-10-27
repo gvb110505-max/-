@@ -56,6 +56,26 @@
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
   th{opacity:.6;font-weight:500}
+  .sigbox{border-radius:10px;padding:14px;text-align:center;transition:background .2s}
+  .sigbox.wait{background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.2)}
+  .sigbox.fire{background:rgba(69,224,138,.14);border:2px solid #45e08a;animation:pulse 1.1s ease-in-out 3}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(69,224,138,0)}50%{box-shadow:0 0 0 10px rgba(69,224,138,.18)}}
+  .sigbox .stat{font-size:13px;opacity:.7;letter-spacing:1px}
+  .sigbox .grade{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;
+        background:#45e08a;color:#0e1220;margin-bottom:6px}
+  .sigbox .grade.Bg{background:#8fd66f}.sigbox .grade.Cg{background:#e0c45e}
+  .gate{margin:10px 0 2px}
+  .gate .glbl{display:flex;justify-content:space-between;font-size:11px;opacity:.65;margin-bottom:3px}
+  .gate .gbar{height:10px;background:rgba(255,255,255,.1);border-radius:5px;overflow:hidden;position:relative}
+  .gate .gbar i{display:block;height:100%;background:#2b6cf6;transition:width .25s}
+  .gate .gbar i.ready{background:#45e08a}
+  .chk{display:flex;flex-direction:column;gap:4px;margin-top:10px;text-align:left}
+  .chk div{font-size:11.5px;opacity:.8}
+  .chk .ok{color:#45e08a}.chk .no{opacity:.45}
+  .cap{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .cap .box{flex:1;min-width:92px;background:rgba(0,0,0,.28);border-radius:8px;padding:8px 10px}
+  .cap .box .k{font-size:11px;opacity:.6}
+  .cap .box .vv{font-size:17px;font-weight:700;margin-top:2px}
   .verdict{display:flex;gap:8px;margin:10px 0 4px}
   .vhalf{flex:1;border-radius:8px;padding:8px;text-align:center;background:rgba(255,255,255,.06)}
   .vhalf.on{background:rgba(69,224,138,.18);border:1px solid rgba(69,224,138,.5)}
@@ -137,7 +157,7 @@
 <div class="wrap">
   <a class="back" href="index.html">&larr; 홈</a>
   <h1>🎴 바카라 화면 분석 · 패턴 봇</h1>
-  <div class="sub">화면 공유 → 로드맵 영역 지정 → 자동 판독 → 패턴 분석 & 베팅 제안</div>
+  <div class="sub">확실한 자리에서만 신호 · 자산 기반 베팅 지시 · 실제 결과로 승패 판정</div>
 
   <div class="warn">
     <b>먼저 읽어주세요.</b> 바카라의 각 판은 독립 시행입니다. 과거 패턴은 다음 결과의 확률을 바꾸지 않으며,
@@ -205,25 +225,59 @@
 
     <div>
       <div class="panel">
-        <h2>4. 베팅 제안</h2>
-        <div class="rec">
-          <div class="pick" id="pick">-</div>
-          <div class="conf"><i id="confBar" style="width:0%"></i></div>
-          <div class="verdict">
-            <div class="vhalf" id="vFollow"><div class="vt">쭉 (유지)</div><div class="vp">-</div></div>
-            <div class="vhalf" id="vBreak"><div class="vt">꺾임 (전환)</div><div class="vp">-</div></div>
+        <h2>4. 신호 대기 / 베팅 지시</h2>
+
+        <div class="cap">
+          <div class="box"><div class="k">시작 자산</div>
+            <input type="number" id="capital" value="1000000" min="0" step="10000"
+                   style="width:100%;margin:0;font-size:15px;font-weight:700">
           </div>
-          <div class="betline">
-            <div style="font-size:11px;opacity:.7">권장 베팅 금액</div>
+          <div class="box"><div class="k">현재 자산</div><div class="vv" id="capNow">-</div></div>
+          <div class="box"><div class="k">신호 전적</div><div class="vv" id="capRec">0승 0패</div></div>
+        </div>
+
+        <div class="sigbox wait" id="sigBox">
+          <div class="grade" id="sigGrade" style="display:none">A급</div>
+          <div class="stat" id="sigStat">기록을 입력하면 신호를 찾기 시작합니다</div>
+          <div class="pick" id="pick">-</div>
+          <div class="betline" id="betLine" style="display:none">
+            <div style="font-size:11px;opacity:.7">이번 라운드 베팅 금액</div>
             <div class="amt" id="betAmt">-</div>
             <div class="bn" id="betNote"></div>
           </div>
-          <div class="why" id="why">기록이 쌓이면 분석을 시작합니다.</div>
+          <div class="gate">
+            <div class="glbl"><span>신호 강도</span><span id="gateTxt">0.00 / 0.40</span></div>
+            <div class="gbar"><i id="gateBar" style="width:0%"></i></div>
+          </div>
+          <div class="chk" id="sigChk"></div>
         </div>
+
+        <div style="margin-top:10px">
+          <label>신호 민감도</label>
+          <select id="sens">
+            <option value="strict">엄격 (확실한 자리만)</option>
+            <option value="normal" selected>보통</option>
+            <option value="loose">느슨 (신호 많음)</option>
+          </select>
+          <label><input type="checkbox" id="always" style="margin-right:4px">매 라운드 표시</label>
+        </div>
+        <div class="conf" style="margin-top:10px"><i id="confBar" style="width:0%"></i></div>
+        <div class="verdict">
+          <div class="vhalf" id="vFollow"><div class="vt">쭉 (유지)</div><div class="vp">-</div></div>
+          <div class="vhalf" id="vBreak"><div class="vt">꺾임 (전환)</div><div class="vp">-</div></div>
+        </div>
+        <div class="why" id="why">기록이 쌓이면 분석을 시작합니다.</div>
       </div>
 
       <div class="panel">
-        <h2>5. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
+        <h2>5. 신호 기록</h2>
+        <table id="sigLog"><tbody></tbody></table>
+        <div class="hint">봇이 신호를 띄운 라운드만 기록합니다. 실제 뱅커/플레이어 결과로 승패를 판정하고
+          자산을 갱신합니다 (뱅커 적중 시 5% 커미션 차감, 타이는 무승부 처리).</div>
+      </div>
+
+      <div class="panel">
+        <h2>6. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
         <input id="patIn" placeholder="예: BBB · BPBP · 1-2-1-2" style="width:150px;background:rgba(0,0,0,.35);
           color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:5px 7px;font-size:12px">
         <button onclick="addPattern()">패턴 추가</button>
@@ -238,33 +292,35 @@
       </div>
 
       <div class="panel">
-        <h2>6. 감지된 패턴</h2>
+        <h2>7. 감지된 패턴</h2>
         <div class="plist" id="plist"></div>
       </div>
 
       <div class="panel">
-        <h2>7. 패턴별 실적 (백테스트)</h2>
+        <h2>8. 패턴별 실적 (백테스트)</h2>
         <table id="ptable"><tbody></tbody></table>
         <div class="hint">이 슈의 기록을 처음부터 되돌려(백테스트) 각 패턴이 실제로 몇 번 맞았는지 계산합니다.
           Wilson 95% 신뢰구간이 50%를 포함하면 <b>우연과 구분되지 않는다</b>는 뜻이며, 그런 패턴은 가중치가 자동으로 낮아집니다.</div>
       </div>
 
       <div class="panel">
-        <h2>8. 무작위성 검정</h2>
+        <h2>9. 무작위성 검정</h2>
         <table id="rand"><tbody></tbody></table>
         <div class="hint">런 검정 · 카이제곱 · 엔트로피로 "이 슈가 정말 무작위와 다른가"를 통계적으로 확인합니다.</div>
       </div>
 
       <div class="panel">
-        <h2>9. 슈 통계</h2>
+        <h2>10. 슈 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>10. 자금 관리 & 성적</h2>
+        <h2>11. 자금 관리 & 성적</h2>
         <div style="margin-bottom:10px">
-          <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px">
-          <label>1유닛</label><input type="number" id="unit" value="10" min="1" style="width:60px">
+          <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px" readonly
+            title="패널 4의 현재 자산을 따릅니다">
+          <label>1유닛</label><input type="number" id="unit" value="10" min="1" style="width:60px" readonly
+            title="자산의 1%로 자동 계산됩니다">
           <label>켈리 비율</label><input type="number" id="kelly" value="25" min="0" max="100" style="width:52px"><span style="font-size:11px;opacity:.6">%</span>
         </div>
         <div style="margin-bottom:10px">
@@ -283,7 +339,7 @@
       </div>
 
       <div class="panel">
-        <h2>11. 세션</h2>
+        <h2>12. 세션</h2>
         <button class="ghost" onclick="saveSession()">저장</button>
         <button class="ghost" onclick="loadSession()">불러오기</button>
         <button class="ghost" onclick="exportCSV()">CSV 내보내기</button>
@@ -313,6 +369,8 @@ const S = {
   custom: [],           // 사용자 패턴 라이브러리
   bet: {step:0, idx:0}, // 진행형 베팅 전략 단계
   src: 'video',         // 'video' = 화면 공유, 'img' = 사진
+  sig: {log:[], pending:null, lastIdx:-99},  // 신호 기록 / 대기 중인 신호
+  capNow: null,         // 현재 자산 (신호 결과로 갱신)
   perf: {n:0, hit:0, pnl:0}
 };
 
@@ -571,20 +629,31 @@ function gridToSequence(grid, rows, cols){
 /* ---------------- 수동 입력 ---------------- */
 function manual(v){ addResult(v); }
 function undo(){ S.history.pop(); S.lastRead=null; render(); }
-function resetAll(){ S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0,money:0}; S.bet={step:0,idx:0}; render(); }
+function resetAll(){
+  S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0,money:0};
+  S.bet={step:0,idx:0}; S.sig={log:[],pending:null,lastIdx:-99}; S.capNow=null; render();
+}
 
 function addResult(v){
-  // 직전 추천 성적 + 베팅 단계 반영
-  if (S.pendingRec && S.pendingRec !== 'SKIP' && v !== 'T'){
-    const stake = S.pendingBet || 0;
-    const unit  = +document.getElementById('unit').value || 1;
-    const units = stake / unit;
-    const won   = v === S.pendingRec;
-    S.perf.n++;
-    if (won){ S.perf.hit++; S.perf.pnl += units * (v === 'B' ? 0.95 : 1); }
-    else S.perf.pnl -= units;
-    S.perf.money = (S.perf.money || 0) + (won ? stake * (v === 'B' ? 0.95 : 1) : -stake);
-    if (stake > 0) advanceStake(won);
+  /* 봇이 신호를 띄운 라운드만 승패 판정 — 실제 뱅커/플레이어 결과로 */
+  const sp = S.sig.pending;
+  if (sp){
+    const rec = {idx:sp.idx, grade:sp.grade, pick:sp.pick, amt:sp.amt, actual:v, res:null, delta:0};
+    if (v === 'T') rec.res = 'tie';                                   // 타이는 베팅 반환
+    else if (v === sp.pick){ rec.res = 'win';  rec.delta =  Math.round(sp.amt * (v === 'B' ? 0.95 : 1)); }
+    else                   { rec.res = 'lose'; rec.delta = -sp.amt; }
+    S.capNow = capital() + rec.delta;
+    S.sig.log.push(rec);
+    S.sig.pending = null;
+
+    if (v !== 'T'){
+      S.perf.n++;
+      const unit = Math.max(1, Math.round(sp.cap * 0.01));
+      if (rec.res === 'win'){ S.perf.hit++; S.perf.pnl += sp.amt/unit * (v === 'B' ? 0.95 : 1); }
+      else S.perf.pnl -= sp.amt/unit;
+      S.perf.money = (S.perf.money || 0) + rec.delta;
+      if (sp.amt > 0) advanceStake(rec.res === 'win');
+    }
   }
   S.history.push(v);
   render();
@@ -1050,12 +1119,38 @@ function render(){
   S.pendingRec = hist.length >= 8 ? a.pick : null;
   S.lastAnalysis = a;
 
-  /* 4. 추천 */
+  /* 4. 신호 게이트 */
+  const sg = evalSignal(a, hist);
+  const always = document.getElementById('always').checked;
+  const show = sg.fire || always;
+  S.lastSignal = sg;
+
   const names = {B:'뱅커 (BANKER)', P:'플레이어 (PLAYER)', SKIP:'관망'};
   const pickEl = document.getElementById('pick');
-  pickEl.textContent = names[a.pick];
-  pickEl.style.color = a.pick==='B' ? '#ff7b85' : a.pick==='P' ? '#79aaff' : '#aab';
+  const sigBox = document.getElementById('sigBox');
+  const grEl   = document.getElementById('sigGrade');
+
+  sigBox.className = 'sigbox ' + (sg.fire ? 'fire' : 'wait');
+  grEl.style.display = sg.fire ? 'inline-block' : 'none';
+  grEl.textContent = sg.grade + '급 신호';
+  grEl.className = 'grade ' + (sg.grade === 'B' ? 'Bg' : sg.grade === 'C' ? 'Cg' : '');
+  document.getElementById('sigStat').textContent = sg.fire
+    ? '확실한 자리 — 지금 베팅하세요'
+    : (always ? '신호 없음 (매 라운드 표시 중)' : '신호 대기 중 — 조건이 모두 충족되면 알립니다');
+
+  pickEl.textContent = show ? names[a.pick] : '대기';
+  pickEl.style.color = !show ? '#5a6274'
+    : a.pick === 'B' ? '#ff7b85' : a.pick === 'P' ? '#79aaff' : '#aab';
   document.getElementById('confBar').style.width = (a.conf*100).toFixed(0)+'%';
+
+  // 게이트 진행도
+  const gp = Math.min(100, sg.strength/sg.need*100);
+  const gbar = document.getElementById('gateBar');
+  gbar.style.width = gp.toFixed(0)+'%';
+  gbar.className = sg.fire ? 'ready' : '';
+  document.getElementById('gateTxt').textContent = `${sg.strength.toFixed(2)} / ${sg.need}`;
+  document.getElementById('sigChk').innerHTML = sg.checks
+    .map(c => `<div class="${c.ok ? 'ok' : 'no'}">${c.ok ? '✓' : '·'} ${c.k}</div>`).join('');
 
   /* 쭉 / 꺾임 판정 */
   const v = a.verdict, vf = document.getElementById('vFollow'), vb = document.getElementById('vBreak');
@@ -1065,15 +1160,30 @@ function render(){
   vf.querySelector('.vp').innerHTML = v.dir ? `${(v.fPct*100).toFixed(0)}% · ${sideName} 유지` : '표본 부족';
   vb.querySelector('.vp').innerHTML = v.dir ? `${((1-v.fPct)*100).toFixed(0)}% · ${sideName} 끊김` : '표본 부족';
 
-  /* 베팅 금액 */
+  /* 베팅 금액 — 신호가 떴을 때만 지시 */
   const bet = computeBet(a);
-  S.pendingBet = bet.amt;
+  document.getElementById('betLine').style.display = show ? 'block' : 'none';
   document.getElementById('betAmt').textContent = bet.amt ? bet.amt.toLocaleString() : '0 (관망)';
   document.getElementById('betAmt').style.color = bet.amt ? '#8fb4ff' : '#aab';
-  document.getElementById('betNote').innerHTML = bet.note;
+  document.getElementById('betNote').innerHTML =
+    bet.note + `<br>자산 ${capital().toLocaleString()} · 1유닛 ${Math.max(1,Math.round(capital()*0.01)).toLocaleString()} (자산의 1%)`;
+
+  // 신호가 난 라운드만 승패 판정 대상으로 등록
+  if (sg.fire && a.pick !== 'SKIP'){
+    S.sig.pending = {idx:hist.length, pick:a.pick, amt:bet.amt, grade:sg.grade,
+                     score:a.score, agree:sg.agree, cap:capital()};
+    S.pendingRec = a.pick; S.pendingBet = bet.amt;
+    if (S.sig.lastIdx !== hist.length){ S.sig.lastIdx = hist.length; notifySignal(sg, a.pick, bet.amt); }
+  } else {
+    S.sig.pending = null; S.pendingRec = null; S.pendingBet = 0;
+  }
+
   const qb = document.getElementById('qBet');
-  qb.textContent = a.pick === 'SKIP' ? '관망'
-    : `${a.pick === 'B' ? '뱅커' : '플레이어'} · ${bet.amt ? bet.amt.toLocaleString() : 0}`;
+  qb.textContent = sg.fire
+    ? `${sg.grade}급 · ${a.pick === 'B' ? '뱅커' : '플레이어'} ${bet.amt.toLocaleString()}`
+    : '신호 대기';
+
+  renderCapital();
 
   renderLib(a);
 
@@ -1231,12 +1341,120 @@ function drawDerived(id, arr){
 }
 
 
+
+/* ---------------- 신호 게이트 ("확실한 자리"만 통과) ---------------- */
+const SENS = {
+  strict: {score:0.62, agree:0.82, minPat:3, minHand:24, cool:3, btMin:0.50},
+  normal: {score:0.45, agree:0.72, minPat:2, minHand:16, cool:2, btMin:0.47},
+  loose:  {score:0.32, agree:0.62, minPat:2, minHand:10, cool:1, btMin:0.00}
+};
+
+function evalSignal(a, hist){
+  const cfg = SENS[document.getElementById('sens').value] || SENS.normal;
+  const idx = hist.length;
+
+  // 추천 방향에 찬성 / 반대하는 가중치
+  let pro = 0, con = 0;
+  for (const p of a.patterns){
+    if (p.wEff <= 0.02) continue;
+    (p.side === a.pick ? pro += p.wEff : con += p.wEff);
+  }
+  const agree  = (pro + con) ? pro/(pro+con) : 0;
+  const nPat   = a.patterns.filter(p => p.wEff > 0.02).length;
+  const btRate = a.bt.rec.n >= 10 ? a.bt.rec.hit/a.bt.rec.n : null;
+  // 이 슈에서 실적이 검증된 패턴(신뢰구간 하단이 50% 초과)이 추천 방향을 지지하는가
+  const proven = a.patterns.some(p => p.wEff > 0.02 && p.side === a.pick && p.ci && p.ci[0] > 0.5);
+  const cooled = idx - S.sig.lastIdx >= cfg.cool;
+
+  const checks = [
+    {k:`표본 ${idx}판 ≥ ${cfg.minHand}판`,            ok: idx >= cfg.minHand},
+    {k:`신호 강도 ${Math.abs(a.score).toFixed(2)} ≥ ${cfg.score}`, ok: Math.abs(a.score) >= cfg.score},
+    {k:`패턴 일치도 ${(agree*100).toFixed(0)}% ≥ ${(cfg.agree*100).toFixed(0)}%`, ok: agree >= cfg.agree},
+    {k:`지지 패턴 ${nPat}개 ≥ ${cfg.minPat}개`,       ok: nPat >= cfg.minPat},
+    {k: btRate == null ? '백테스트 표본 부족 (통과 처리)'
+       : `이 슈 백테스트 ${(btRate*100).toFixed(0)}% ≥ ${(cfg.btMin*100).toFixed(0)}%`,
+       ok: btRate == null ? true : btRate >= cfg.btMin},
+    {k: cooled ? `쿨다운 통과 (직전 신호 ${S.sig.lastIdx < 0 ? '없음' : (idx - S.sig.lastIdx) + '판 전'})`
+               : `쿨다운 대기 (${cfg.cool - (idx - S.sig.lastIdx)}판 더)`, ok: cooled},
+    {k: proven ? '실적 검증된 패턴이 지지 (가산)' : '실적 검증 패턴 없음 (참고)', ok: proven, soft:true}
+  ];
+
+  const fire = a.pick !== 'SKIP' && checks.every(c => c.soft || c.ok);
+  // 등급: 강도와 일치도로 결정
+  let grade = 'C';
+  if (Math.abs(a.score) >= 0.62 && agree >= 0.82) grade = 'A';
+  else if (Math.abs(a.score) >= 0.45 && agree >= 0.72) grade = 'B';
+  if (proven && grade !== 'A') grade = grade === 'B' ? 'A' : 'B';
+
+  return {fire, grade, checks, agree, nPat, need:cfg.score, strength:Math.abs(a.score)};
+}
+
+/* 신호가 떴을 때 알림 (진동 · 소리 · 알림창) */
+function notifySignal(sg, pick, amt){
+  try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch(e){}
+  try {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (C){
+      const ac = new C(), o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.frequency.value = sg.grade === 'A' ? 880 : 660; o.type = 'sine';
+      g.gain.setValueAtTime(0.14, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.45);
+      o.start(); o.stop(ac.currentTime + 0.45);
+    }
+  } catch(e){}
+  try {
+    if (window.Notification && Notification.permission === 'granted')
+      new Notification(`${sg.grade}급 신호 — ${pick === 'B' ? '뱅커' : '플레이어'}`,
+                       {body:`${amt.toLocaleString()} 베팅`, tag:'bacc-sig'});
+  } catch(e){}
+}
+
+
+/* ---------------- 자산 / 신호 기록 ---------------- */
+function renderCapital(){
+  const start = capStart(), now = capital();
+  const w = S.sig.log.filter(l => l.res === 'win').length;
+  const l = S.sig.log.filter(l => l.res === 'lose').length;
+  const t = S.sig.log.filter(l => l.res === 'tie').length;
+  const diff = now - start;
+
+  document.getElementById('capNow').textContent = now.toLocaleString();
+  document.getElementById('capNow').style.color = diff > 0 ? '#45e08a' : diff < 0 ? '#ff7b85' : '#e8ecf7';
+  document.getElementById('capRec').textContent =
+    `${w}승 ${l}패` + (t ? ` ${t}무` : '') + (w+l ? ` (${(w/(w+l)*100).toFixed(0)}%)` : '');
+
+  // 패널 11이 참조하는 값 동기화
+  document.getElementById('bank').value = now;
+  document.getElementById('unit').value = Math.max(1, Math.round(now*0.01));
+
+  const rows = S.sig.log.slice().reverse().slice(0, 30).map(x => `
+    <tr>
+      <td>${x.idx}판</td>
+      <td><b>${x.grade}</b></td>
+      <td style="color:${x.pick === 'B' ? '#ff7b85' : '#79aaff'}">${x.pick === 'B' ? '뱅커' : '플레이어'}</td>
+      <td>${x.amt.toLocaleString()}</td>
+      <td>${x.actual ? (x.actual === 'B' ? '뱅커' : x.actual === 'P' ? '플레이어' : '타이') : '대기'}</td>
+      <td style="color:${x.res === 'win' ? '#45e08a' : x.res === 'lose' ? '#ff7b85' : '#aab'}">
+        ${x.res === 'win' ? '적중' : x.res === 'lose' ? '실패' : x.res === 'tie' ? '무승부' : '-'}</td>
+      <td style="color:${x.delta > 0 ? '#45e08a' : x.delta < 0 ? '#ff7b85' : '#aab'}">
+        ${x.delta > 0 ? '+' : ''}${(x.delta || 0).toLocaleString()}</td>
+    </tr>`).join('');
+  document.querySelector('#sigLog tbody').innerHTML = rows
+    ? `<tr><th>시점</th><th>등급</th><th>지시</th><th>베팅</th><th>결과</th><th>판정</th><th>증감</th></tr>${rows}`
+    : '<tr><td style="opacity:.5;font-size:12px">아직 신호가 없습니다. 조건을 모두 통과하는 자리에서만 기록됩니다.</td></tr>';
+}
+
+/* ---------------- 자산 ---------------- */
+function capStart(){ return +document.getElementById('capital').value || 0; }
+function capital(){ return S.capNow == null ? capStart() : S.capNow; }
+
 /* ---------------- 베팅 금액 추천 ---------------- */
 const SEQ1326 = [1,3,2,6];
 
 function computeBet(a){
-  const bank = +document.getElementById('bank').value || 0;
-  const unit = +document.getElementById('unit').value || 1;
+  const bank = capital();
+  const unit = Math.max(1, Math.round(bank * 0.01));   // 1유닛 = 자산의 1%
   const kf   = (+document.getElementById('kelly').value || 0)/100;
   const strat= document.getElementById('strat').value;
   const r    = a.bt.rec;
@@ -1339,7 +1557,7 @@ const msg = t => document.getElementById('sessMsg').textContent = t;
 
 function saveSession(){
   try {
-    localStorage.setItem('baccarat-bot', JSON.stringify({h:S.history, perf:S.perf, custom:S.custom, t:Date.now()}));
+    localStorage.setItem('baccarat-bot', JSON.stringify({h:S.history, perf:S.perf, custom:S.custom, sig:S.sig, cap:S.capNow, t:Date.now()}));
     msg(`저장 완료 (${S.history.length}판)`);
   } catch(e){ msg('저장 실패: ' + e.message); }
 }
@@ -1349,6 +1567,8 @@ function loadSession(){
     if (!d) return msg('저장된 기록이 없습니다.');
     S.history = d.h || []; S.perf = d.perf || {n:0,hit:0,pnl:0};
     if (d.custom && d.custom.length) S.custom = d.custom;
+    if (d.sig) S.sig = d.sig;
+    S.capNow = (d.cap != null ? d.cap : null);
     render(); msg(`불러오기 완료 (${S.history.length}판, ${new Date(d.t).toLocaleString()})`);
   } catch(e){ msg('불러오기 실패: ' + e.message); }
 }
@@ -1372,9 +1592,11 @@ function importPrompt(){
   S.history = h; render(); msg(`${h.length}판을 불러왔습니다.`);
 }
 
-document.getElementById('strat').addEventListener('change', render);
-['bank','unit','kelly'].forEach(id =>
-  document.getElementById(id).addEventListener('input', () => renderMoney(S.lastAnalysis || analyze(S.history))));
+['strat','sens','always'].forEach(id => document.getElementById(id).addEventListener('change', render));
+document.getElementById('capital').addEventListener('input', () => { if (!S.sig.log.length) S.capNow = null; render(); });
+if (window.Notification && Notification.permission === 'default')
+  document.getElementById('sigBox').addEventListener('click', () => Notification.requestPermission(), {once:true});
+document.getElementById('kelly').addEventListener('input', () => render());
 
 ['rows','cols'].forEach(id=>document.getElementById(id).addEventListener('input', applyBox));
 window.addEventListener('resize', applyBox);
