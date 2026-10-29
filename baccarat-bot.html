@@ -217,7 +217,7 @@
 
       <div class="panel roads">
         <h2>3. 로드맵</h2>
-        <div class="roadlbl">빅로드 (Big Road)</div><div class="road" id="bigRoad"></div>
+        <div class="roadlbl">빅로드 (Big Road) · 6행에서 꺾임</div><div class="road" id="bigRoad"></div>
         <div class="roadlbl">큰눈길 (Big Eye Boy)</div><div class="road" id="beb"></div>
         <div class="roadlbl">작은길 (Small Road)</div><div class="road" id="sr"></div>
         <div class="roadlbl">바퀴벌레길 (Cockroach Pig)</div><div class="road" id="cp"></div>
@@ -801,7 +801,7 @@ function genCatalog(){
       out.push(sh);
     }
   }
-  for (let a = 1; a <= 5; a++) for (let b = 1; b <= 5; b++) if (a !== b) out.push(`${a}-${b}`);
+  for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (a !== b) out.push(`${a}-${b}`);
   for (let a = 1; a <= 4; a++) for (let b = 1; b <= 4; b++) for (let c = 1; c <= 4; c++)
     if (!(a === b && b === c)) out.push(`${a}-${b}-${c}`);
   for (let a = 2; a <= 6; a++) out.push(`${a}-${a}`);
@@ -1098,6 +1098,75 @@ function detectPatterns(hist){
           `큰눈길·작은길·바퀴벌레길이 모두 ${red===3?'빨강(흐름 유지)':'파랑(흐름 전환)'}`);
     else
       add('road2', '파생로드 우세', red>=2?side:OPP(side), 0.12, `파생로드 빨강 ${red}/3 — ${red>=2?'유지':'전환'} 우세`);
+  }
+
+  /* ---------- 6칸 격자 패턴 ----------
+     빅로드는 6행에서 꺾여 옆 열로 넘어간다. 그래서 "플뱅플뱅"도 몇 번째
+     반복인지, 지금 몇 번째 행에 있는지에 따라 이어질 확률이 달라진다.
+     이 구간은 선형 시퀀스가 아니라 격자 구조 자체를 본다. */
+
+  // 같은 높이가 연속된 열이 몇 개나 이어졌는지 (현재 포함)
+  const runOf = (h) => {
+    let k = 0;
+    for (let i = L.length - 1; i >= 0 && L[i] === h; i--) k++;
+    return k;
+  };
+  // 완성된 열에서 높이 h인 열이 연달아 이어진 구간들의 길이 분포
+  const runLens = (h) => {
+    const out = []; let k = 0;
+    for (const v of done){ if (v === h) k++; else { if (k) out.push(k); k = 0; } }
+    if (k) out.push(k);
+    return out;
+  };
+
+  for (const [h, label, cue] of [[1,'핑퐁 연속','1칸 열'], [2,'쌍줄 연속','2칸 열'], [3,'삼줄 연속','3칸 열']]){
+    if (cur !== h) continue;
+    const k = runOf(h);                       // 지금 h칸 열이 k번째
+    if (k < 2) continue;
+    const rs = runLens(h);
+    const ext = rs.filter(v => v >  k).length;   // k보다 길게 이어진 적
+    const end = rs.filter(v => v === k).length;  // 정확히 k에서 끝난 적
+    if (ext + end < 3) continue;
+    const rate = ext/(ext+end);                  // k번째에서 더 이어질 비율
+    // 이어진다 = 이번 열도 h칸에서 끝난다 → fromExpected(h, ...)
+    add('grid:run'+h, `🔳 ${label} ${k}회째`,
+        rate >= 0.5 ? fromExpected(h, cur, side) : (cur >= h ? side : OPP(side)),
+        Math.min(0.28, Math.abs(rate-0.5)*0.5 + (ext+end)*0.012),
+        `${cue}이 ${k}번 연속 — 이 슈에서 ${k}번째까지 간 ${ext+end}회 중 ${ext}회가 더 이어짐 (${pct(rate)})`);
+  }
+
+  // 현재 행 위치 (6칸에서 꺾이므로 7번째부터는 꼬리)
+  const row    = cur > 6 ? 6 : cur;
+  const onTail = cur > 6;
+  if (cur >= 2){
+    const reach = done.filter(l => Math.min(l,6) >= row).length;
+    const stop  = done.filter(l => Math.min(l,6) === row).length;
+    if (reach >= 3){
+      const brk = stop/reach;
+      add('grid:row'+row, `🔳 ${row}행 도달${onTail ? ' (꼬리 진행)' : ''}`,
+          brk > 0.5 ? OPP(side) : side,
+          Math.min(0.24, Math.abs(brk-0.5)*0.45 + reach*0.01),
+          `이 슈에서 ${row}행까지 간 열 ${reach}개 중 ${stop}개가 그 행에서 끊김 (${pct(brk)})` +
+          (onTail ? ' · 6칸을 넘겨 가로로 뻗는 중' : ''));
+    }
+  }
+
+  // 최근 두 열의 높이 실루엣 (6칸 기준) → 다음 열 높이 분포
+  if (done.length >= 3){
+    const cap = v => Math.min(v, 6);
+    const key = `${cap(done[done.length-2])}-${cap(done[done.length-1])}`;
+    const nxt = new Map();
+    for (let i = 0; i + 2 < done.length; i++){
+      if (`${cap(done[i])}-${cap(done[i+1])}` !== key) continue;
+      const v = cap(done[i+2]);
+      nxt.set(v, (nxt.get(v) || 0) + 1);
+    }
+    let tot = 0, best = null, bestC = 0;
+    for (const [v,c] of nxt){ tot += c; if (c > bestC){ bestC = c; best = v; } }
+    if (tot >= 3 && best != null)
+      add('grid:silh', `🔳 열 실루엣 ${key}`, fromExpected(best, cur, side),
+          Math.min(0.24, bestC/tot*0.22 + tot*0.012),
+          `높이 ${key} 뒤에 온 열 ${tot}개 중 ${bestC}개가 ${best}칸 — 이번 열 예상 ${best}칸 (현재 ${cur}칸)`);
   }
 
   libraryDetect(hist, nz, done, cur, side, add);
