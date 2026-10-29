@@ -668,7 +668,8 @@ function addResult(v){
   /* 봇이 신호를 띄운 라운드만 승패 판정 — 실제 뱅커/플레이어 결과로 */
   const sp = S.sig.pending;
   if (sp){
-    const rec = {idx:sp.idx, grade:sp.grade, pick:sp.pick, amt:sp.amt, actual:v, res:null, delta:0};
+    const rec = {idx:sp.idx, grade:sp.grade, kind:sp.kind || 'signal',
+                 pick:sp.pick, amt:sp.amt, actual:v, res:null, delta:0};
     if (v === 'T') rec.res = 'tie';                                   // 타이는 베팅 반환
     else if (v === sp.pick){ rec.res = 'win';  rec.delta =  Math.round(sp.amt * (v === 'B' ? 0.95 : 1)); }
     else                   { rec.res = 'lose'; rec.delta = -sp.amt; }
@@ -1206,6 +1207,7 @@ function commitShoe(silent){
     L.n += st.n; L.hit += st.hit; L.name = st.name;
   }
   for (const g of S.sig.log){
+    if (g.kind === 'always') continue;
     if (g.res !== 'win' && g.res !== 'lose') continue;
     const G = S.learn.grades[g.grade] = S.learn.grades[g.grade] || {n:0, hit:0};
     G.n++; if (g.res === 'win') G.hit++;
@@ -1232,7 +1234,8 @@ function pooledStat(key, shoeStat){
 
 function gradeStat(grade){
   const G = S.learn.grades[grade] || {n:0, hit:0};
-  const cur = S.sig.log.filter(x => x.grade === grade && (x.res === 'win' || x.res === 'lose'));
+  const cur = S.sig.log.filter(x => x.kind !== 'always' && x.grade === grade &&
+                                    (x.res === 'win' || x.res === 'lose'));
   return {n: G.n + cur.length, hit: G.hit + cur.filter(x => x.res === 'win').length};
 }
 
@@ -1448,12 +1451,15 @@ function render(){
   document.getElementById('betNote').innerHTML =
     bet.note + `<br>자산 ${capital().toLocaleString()} · 1유닛 ${Math.max(1,Math.round(capital()*0.01)).toLocaleString()} (자산의 1%)`;
 
-  // 신호가 난 라운드만 승패 판정 대상으로 등록
-  if (sg.fire && a.pick !== 'SKIP'){
+  // 베팅 금액을 띄운 라운드는 모두 승패 판정 대상 (신호 / 매 라운드 표시 공통)
+  if (show && a.pick !== 'SKIP' && bet.amt > 0){
     S.sig.pending = {idx:hist.length, pick:a.pick, amt:bet.amt, grade:sg.grade,
+                     kind: sg.fire ? 'signal' : 'always',
                      score:a.score, agree:sg.agree, cap:capital()};
     S.pendingRec = a.pick; S.pendingBet = bet.amt;
-    if (S.sig.lastIdx !== hist.length){ S.sig.lastIdx = hist.length; notifySignal(sg, a.pick, bet.amt); }
+    if (sg.fire && S.sig.lastIdx !== hist.length){
+      S.sig.lastIdx = hist.length; notifySignal(sg, a.pick, bet.amt);
+    }
   } else {
     S.sig.pending = null; S.pendingRec = null; S.pendingBet = 0;
   }
@@ -1760,7 +1766,8 @@ function renderCapital(){
   const t = S.sig.log.filter(l => l.res === 'tie').length;
   const diff = now - start;
 
-  document.getElementById('capNow').textContent = now.toLocaleString();
+  document.getElementById('capNow').innerHTML = now.toLocaleString() +
+    (diff ? `<span style="font-size:11px;opacity:.8"> (${diff > 0 ? '+' : ''}${diff.toLocaleString()})</span>` : '');
   document.getElementById('capNow').style.color = diff > 0 ? '#45e08a' : diff < 0 ? '#ff7b85' : '#e8ecf7';
   document.getElementById('capRec').textContent =
     `${w}승 ${l}패` + (t ? ` ${t}무` : '') + (w+l ? ` (${(w/(w+l)*100).toFixed(0)}%)` : '');
@@ -1771,10 +1778,10 @@ function renderCapital(){
 
   const rows = S.sig.log.slice().reverse().slice(0, 30).map(x => `
     <tr>
-      <td>${x.idx}판</td>
-      <td><b>${x.grade}</b></td>
-      <td style="color:${x.pick === 'B' ? '#ff7b85' : '#79aaff'}">${x.pick === 'B' ? '뱅커' : '플레이어'}</td>
-      <td>${x.amt.toLocaleString()}</td>
+      <td>${x.idx != null ? x.idx + '판' : '-'}</td>
+      <td>${x.kind === 'always' ? '<span style="opacity:.5">일반</span>' : `<b>${x.grade}</b>`}</td>
+      <td style="color:${x.pick === 'B' ? '#ff7b85' : '#79aaff'}">${x.pick === 'B' ? '뱅커' : x.pick === 'P' ? '플레이어' : '-'}</td>
+      <td>${(x.amt || 0).toLocaleString()}</td>
       <td>${x.actual ? (x.actual === 'B' ? '뱅커' : x.actual === 'P' ? '플레이어' : '타이') : '대기'}</td>
       <td style="color:${x.res === 'win' ? '#45e08a' : x.res === 'lose' ? '#ff7b85' : '#aab'}">
         ${x.res === 'win' ? '적중' : x.res === 'lose' ? '실패' : x.res === 'tie' ? '무승부' : '-'}</td>
@@ -1939,7 +1946,12 @@ function importPrompt(){
 }
 
 ['strat','sens','always'].forEach(id => document.getElementById(id).addEventListener('change', render));
-document.getElementById('capital').addEventListener('input', () => { if (!S.sig.log.length) S.capNow = null; render(); });
+// 시작 자산을 바꾸면 지금까지의 증감을 그대로 얹어 현재 자산을 다시 계산한다
+document.getElementById('capital').addEventListener('input', () => {
+  const delta = S.sig.log.reduce((t, x) => t + (x.delta || 0), 0);
+  S.capNow = S.sig.log.length ? capStart() + delta : null;
+  render();
+});
 if (window.Notification && Notification.permission === 'default')
   document.getElementById('sigBox').addEventListener('click', () => Notification.requestPermission(), {once:true});
 document.getElementById('kelly').addEventListener('input', () => render());
