@@ -303,11 +303,16 @@
         <button onclick="addPattern()">패턴 추가</button>
         <button class="ghost" onclick="resetPatterns()">기본값 복원</button>
         <div class="lib" id="lib"></div>
+        <div class="hint" id="catInfo" style="margin-top:6px"></div>
         <div class="hint">
           <b>B/P 문자열</b>은 <b>모양</b>으로 인식합니다 — <code>BBP</code>는 "두 번 같은 쪽 뒤 반대"라는 뜻이라
           <code>PPB</code>도 같은 패턴으로 봅니다. <b>1-2-1-2</b> 처럼 숫자를 넣으면 <b>열 길이 주기</b>로 봅니다.<br>
           현재 모양과 일치한 패턴은 초록으로 표시되고, <b>이 슈에서 그 모양 다음에 실제로 쭉 갔는지 꺾였는지</b>를
-          세어 스스로 방향을 정합니다.
+          세어 스스로 방향을 정합니다.<br>
+          아래 자동 카탈로그는 길이 3~7의 <b>모든 결과 모양</b>과 2~3마디 <b>모든 열 길이 주기</b>를 빠짐없이 깔아둔 것입니다.
+          이름 붙은 패턴(용·퐁당·원투…)도 이 공간 안에 들어 있으므로, 이름이 아니라 <b>데이터로</b> 골라냅니다.
+          한꺼번에 200개가 투표하면 우연이 섞이므로 표본이 가장 두터운 3개만 반영하고,
+          "검증됨" 판정에는 <b>다중검정 보정(BH, q&lt;0.10)</b>을 겁니다.
         </div>
       </div>
 
@@ -784,6 +789,29 @@ const DEFAULT_PATTERNS = [
   'BBB', 'BBBB', 'BPBP', 'BBPP', 'BBBP', 'BPPB', 'BBPB', 'BPBB'
 ];
 
+/* 자동 카탈로그 — 길이 3~7의 모든 결과 모양과, 2~3마디 열 길이 주기를
+   빠짐없이 생성한다. 이름 붙은 패턴(용·퐁당·원투…)은 이 공간의 일부이므로,
+   공간 전체를 깔아두고 "이 슈에서 실제로 맞은 것"만 데이터로 걸러낸다. */
+function genCatalog(){
+  const out = [];
+  for (let n = 3; n <= 7; n++){
+    for (let m = 0; m < (1 << (n-1)); m++){
+      let sh = 'B';
+      for (let j = 1; j < n; j++) sh += ((m >> (j-1)) & 1) ? 'P' : 'B';
+      out.push(sh);
+    }
+  }
+  for (let a = 1; a <= 5; a++) for (let b = 1; b <= 5; b++) if (a !== b) out.push(`${a}-${b}`);
+  for (let a = 1; a <= 4; a++) for (let b = 1; b <= 4; b++) for (let c = 1; c <= 4; c++)
+    if (!(a === b && b === c)) out.push(`${a}-${b}-${c}`);
+  for (let a = 2; a <= 6; a++) out.push(`${a}-${a}`);
+  return [...new Set(out)];
+}
+const CATALOG_RAW = genCatalog();
+const CAT_MAXSEQ  = 7;        // 모양 패턴 최대 길이
+const CAT_TOPK    = 3;        // 한 라운드에 반영할 카탈로그 패턴 수
+const CAT_MINN    = 5;        // 카탈로그 패턴 최소 표본
+
 // 모양 정규화: 첫 결과를 A로 두고 같으면 A, 다르면 B → BBP 와 PPB 를 같은 패턴으로 취급
 const shapeOf = a => a.map(v => v === a[0] ? 'A' : 'B').join('');
 
@@ -797,55 +825,109 @@ function parsePattern(raw){
   }
   return null;
 }
+const CATALOG = CATALOG_RAW.map(parsePattern).filter(Boolean);
 
-/* 등록된 패턴이 지금 모양과 맞으면, 이 슈에서 그 모양 다음에
-   실제로 "쭉 갔는지 / 꺾였는지"를 세어 스스로 방향을 정한다 */
-function libraryDetect(hist, nz, done, cur, side, add){
-  for (const pat of (S.custom.length ? S.custom : [])){
-    if (pat.off) continue;
-
-    if (pat.type === 'seq'){
-      const n = pat.arr.length;
-      if (nz.length < n + 2) continue;
-      const want = shapeOf(pat.arr);
-      if (shapeOf(nz.slice(-n)) !== want) continue;        // 지금 모양이 아님
-
-      let follow = 0, brk = 0;                              // 과거 같은 모양 뒤의 결과
-      for (let i = 0; i + n < nz.length; i++){
-        if (shapeOf(nz.slice(i, i+n)) !== want) continue;
-        (nz[i+n] === nz[i+n-1] ? follow++ : brk++);
-      }
-      const tot = follow + brk;
-      const go = tot >= 3 ? follow > brk : null;            // 표본이 없으면 판단 보류
-      const margin = tot ? Math.abs(follow - brk)/tot : 0;
-      add('lib:'+pat.raw, `📗 ${pat.raw} ${go===null?'(표본부족)':(go?'→ 쭉':'→ 꺾임')}`,
-          go === null ? side : (go ? side : OPP(side)),
-          go === null ? 0 : Math.min(0.34, margin*0.4 + tot*0.015),
-          tot >= 3
-            ? `이 슈에서 같은 모양 ${tot}회 → 쭉 ${follow} / 꺾임 ${brk} (${(Math.max(follow,brk)/tot*100).toFixed(0)}%)`
-            : `모양은 일치하지만 이 슈의 과거 표본이 ${tot}회뿐 — 판단 보류`);
+/* 한 번의 순회로 모든 모양·주기의 과거 통계를 만든다
+   (패턴마다 전체를 훑으면 200개에서 느려지므로) */
+function buildStats(nz, done){
+  const seq = {};                                  // 길이별 Map(shape → {f,b})
+  for (let n = 3; n <= CAT_MAXSEQ; n++){
+    const m = new Map();
+    for (let i = 0; i + n < nz.length; i++){
+      const a = nz[i];
+      let sh = '';
+      for (let j = 0; j < n; j++) sh += nz[i+j] === a ? 'A' : 'B';
+      let e = m.get(sh); if (!e){ e = {f:0, b:0}; m.set(sh, e); }
+      (nz[i+n] === nz[i+n-1] ? e.f++ : e.b++);     // 쭉 / 꺾임
     }
-
-    else {                                                  // 열 길이 주기
-      const n = pat.arr.length;
-      if (done.length < n) continue;
-      const tail = done.slice(-n);
-      if (!tail.every((v,i) => v === pat.arr[i])) continue;  // 주기가 안 맞음
-      const expected = pat.arr[0];                           // 주기가 한 바퀴 돌아 처음 값
-
-      let ok = 0, no = 0;                                    // 과거 같은 주기 뒤 실제 열 길이
-      for (let i = 0; i + n < done.length; i++){
-        if (!pat.arr.every((v,j) => done[i+j] === v)) continue;
-        (done[i+n] === expected ? ok++ : no++);
-      }
-      const tot = ok + no, rel = tot ? ok/tot : 0.5;
-      add('lib:'+pat.raw, `📗 ${pat.raw} (열 주기)`,
-          fromExpected(expected, cur, side),
-          Math.min(0.30, 0.14 + rel*0.16 + tot*0.02),
-          `열 길이 ${tail.join('-')} 주기 일치 · 이번 열 예상 ${expected}칸 (현재 ${cur}칸)` +
-          (tot ? ` · 과거 ${tot}회 중 ${ok}회 주기 유지` : ''));
-    }
+    seq[n] = m;
   }
+  const len = {};                                  // 마디수별 Map(주기 → Map(다음 열 길이 → 횟수))
+  for (let n = 2; n <= 3; n++){
+    const m = new Map();
+    for (let i = 0; i + n < done.length; i++){
+      const key = done.slice(i, i+n).join('-');
+      let e = m.get(key); if (!e){ e = new Map(); m.set(key, e); }
+      const nx = done[i+n];
+      e.set(nx, (e.get(nx) || 0) + 1);
+    }
+    len[n] = m;
+  }
+  return {seq, len};
+}
+
+/* 한 패턴이 지금 모양과 맞는지 보고, 과거 통계로 방향과 세기를 정한다 */
+function matchPattern(pat, nz, done, cur, side, st){
+  if (pat.type === 'seq'){
+    const n = pat.arr.length;
+    if (n > CAT_MAXSEQ || nz.length < n + 2 || !st.seq[n]) return null;
+    const want = shapeOf(pat.arr);
+    if (shapeOf(nz.slice(-n)) !== want) return null;
+    const e = st.seq[n].get(want) || {f:0, b:0};
+    const tot = e.f + e.b;
+    if (!tot) return {tot:0};
+    const go = e.f > e.b;
+    const margin = Math.abs(e.f - e.b)/tot;
+    return {tot, go, margin, side: go ? side : OPP(side),
+            desc:`같은 모양 ${tot}회 → 쭉 ${e.f} / 꺾임 ${e.b} (${(Math.max(e.f,e.b)/tot*100).toFixed(0)}%)`};
+  }
+  const n = pat.arr.length;
+  if (n > 3 || done.length < n || !st.len[n]) return null;
+  const tail = done.slice(-n);
+  if (!tail.every((v,i) => v === pat.arr[i])) return null;
+  const m = st.len[n].get(pat.arr.join('-'));
+  const expected = pat.arr[0];
+  let ok = 0, tot = 0;
+  if (m) for (const [k, c] of m){ tot += c; if (k === expected) ok += c; }
+  return {tot, go:true, margin: tot ? Math.abs(ok*2 - tot)/tot : 0,
+          side: fromExpected(expected, cur, side),
+          desc:`열 길이 ${tail.join('-')} 주기 · 이번 열 예상 ${expected}칸 (현재 ${cur}칸)` +
+               (tot ? ` · 과거 ${tot}회 중 ${ok}회 주기 유지` : '')};
+}
+
+/* 등록 패턴(이름 있는 것) + 자동 카탈로그 */
+function libraryDetect(hist, nz, done, cur, side, add){
+  const st = buildStats(nz, done);
+
+  for (const pat of S.custom){
+    if (pat.off) continue;
+    const r = matchPattern(pat, nz, done, cur, side, st);
+    if (!r) continue;
+    const weak = r.tot < 3;
+    add('lib:'+pat.raw, `📗 ${pat.raw} ${weak ? '(표본부족)' : (pat.type === 'len' ? '(열 주기)' : (r.go ? '→ 쭉' : '→ 꺾임'))}`,
+        weak ? side : r.side,
+        weak ? 0 : Math.min(0.34, r.margin*0.4 + r.tot*0.015),
+        weak ? `모양은 일치하지만 과거 표본이 ${r.tot}회뿐 — 판단 보류` : r.desc);
+  }
+
+  // 카탈로그: 일치하는 것 중 통계적으로 가장 센 것만 추린다 (200개가 한꺼번에 투표하지 않도록)
+  const hits = [];
+  const own = new Set(S.custom.map(p => p.raw));
+  for (const pat of CATALOG){
+    if (own.has(pat.raw)) continue;
+    const r = matchPattern(pat, nz, done, cur, side, st);
+    if (!r || r.tot < CAT_MINN || !r.margin) continue;
+    r.pat = pat;
+    r.power = r.margin * Math.sqrt(r.tot);          // 세기 × 표본
+    hits.push(r);
+  }
+  hits.sort((a,b) => b.power - a.power);
+  S.catHits = hits.length;
+  for (const r of hits.slice(0, CAT_TOPK))
+    add('cat:'+r.pat.raw, `🧭 ${r.pat.raw}`, r.side,
+        Math.min(0.26, r.margin*0.28 + r.tot*0.008), r.desc);
+}
+
+/* Benjamini-Hochberg: 200개를 동시에 검정할 때의 거짓 양성 보정 */
+function bhAdjust(items){                            // items: [{p}] → q값을 채워 넣는다
+  const arr = items.slice().sort((a,b) => a.p - b.p);
+  const m = arr.length;
+  let prev = 1;
+  for (let i = m - 1; i >= 0; i--){
+    prev = Math.min(prev, arr[i].p * m / (i + 1));
+    arr[i].q = prev;
+  }
+  return items;
 }
 
 /* ---------------- 패턴 감지 ---------------- */
@@ -1193,7 +1275,11 @@ function analyze(hist){
     p.ci = st.n ? wilson(st.hit, st.n) : null;
     p.mult = adaptiveMult(st);
     p.wEff = p.w * p.mult;
+    p.p = st.n >= 10 ? binomP(st.hit, st.n) : null;
   }
+  // 200개 이상을 동시에 보므로, 다중검정 보정(BH) 후에만 "검증됨"으로 인정한다
+  const testable = patterns.filter(x => x.p != null);
+  if (testable.length) bhAdjust(testable);
 
   let score = 0.06;
   for (const p of patterns) score += (p.side === 'B' ? p.wEff : -p.wEff);
@@ -1332,7 +1418,8 @@ function render(){
     <div class="pit">
       <span class="tag ${p.wEff>0.02?p.side:'N'}">${p.wEff>0.02?(p.side==='B'?'뱅커':'플레이어'):'참고'}</span>
       <div><div class="nm">${p.name}</div><div class="ds">${p.desc}</div></div>
-      <span class="wt">${p.w>0 ? `${p.wEff.toFixed(2)}<br><span style="opacity:.7">×${p.mult.toFixed(2)}</span>` : '-'}</span>
+      <span class="wt">${p.w>0 ? `${p.wEff.toFixed(2)}<br><span style="opacity:.7">×${p.mult.toFixed(2)}</span>`
+        + (p.q != null ? `<br><span style="opacity:.6;font-size:10px">q=${p.q.toFixed(2)}</span>` : '') : '-'}</span>
     </div>`).join('') : '<div style="opacity:.5;font-size:12px">아직 감지된 패턴이 없습니다 (최소 6판 필요)</div>';
 
   /* 6. 패턴별 실적 */
@@ -1340,14 +1427,16 @@ function render(){
     const [lo,hi] = wilson(st.hit, st.n), rate = st.hit/st.n, pv = binomP(st.hit, st.n);
     const useful = lo > 0.5;
     const color = useful ? '#45e08a' : (hi < 0.5 ? '#ff7b85' : 'inherit');
+    const q = (a.patterns.find(x => x.key === k) || {}).q;
     return `<tr><td>${st.name}</td><td>${st.hit}/${st.n}</td>
       <td style="color:${color}">${pctS(rate)}</td>
       <td style="opacity:.7">${pctS(lo)}~${pctS(hi)}</td>
       <td style="opacity:.7">${pv.toFixed(3)}</td>
+      <td style="opacity:.7">${q != null ? q.toFixed(2) : '-'}</td>
       <td>×${adaptiveMult(st).toFixed(2)}</td></tr>`;
   }).join('');
   document.querySelector('#ptable tbody').innerHTML = rows
-    ? `<tr><th>패턴</th><th>적중</th><th>확률</th><th>95% CI</th><th>p</th><th>가중</th></tr>${rows}`
+    ? `<tr><th>패턴</th><th>적중</th><th>확률</th><th>95% CI</th><th>p</th><th>q</th><th>가중</th></tr>${rows}`
     : '<tr><td style="opacity:.5">백테스트할 기록이 부족합니다 (최소 8판)</td></tr>';
 
   /* 7. 무작위성 검정 */
@@ -1489,7 +1578,9 @@ function evalSignal(a, hist){
   const nPat   = a.patterns.filter(p => p.wEff > 0.02).length;
   const btRate = a.bt.rec.n >= 10 ? a.bt.rec.hit/a.bt.rec.n : null;
   // 이 슈에서 실적이 검증된 패턴(신뢰구간 하단이 50% 초과)이 추천 방향을 지지하는가
-  const proven = a.patterns.some(p => p.wEff > 0.02 && p.side === a.pick && p.ci && p.ci[0] > 0.5);
+  // 다중검정 보정(q<0.10)을 통과하고 50%를 넘긴 패턴만 "검증됨"으로 친다
+  const proven = a.patterns.some(p => p.wEff > 0.02 && p.side === a.pick &&
+                                      p.q != null && p.q < 0.10 && p.rate > 0.5);
   const cooled = idx - S.sig.lastIdx >= cfg.cool;
 
   const checks = [
@@ -1502,7 +1593,7 @@ function evalSignal(a, hist){
        ok: btRate == null ? true : btRate >= cfg.btMin},
     {k: cooled ? `쿨다운 통과 (직전 신호 ${S.sig.lastIdx < 0 ? '없음' : (idx - S.sig.lastIdx) + '판 전'})`
                : `쿨다운 대기 (${cfg.cool - (idx - S.sig.lastIdx)}판 더)`, ok: cooled},
-    {k: proven ? '실적 검증된 패턴이 지지 (가산)' : '실적 검증 패턴 없음 (참고)', ok: proven, soft:true}
+    {k: proven ? 'FDR 보정 통과 패턴이 지지 (가산)' : 'FDR 보정 통과 패턴 없음 (참고)', ok: proven, soft:true}
   ];
 
   // 학습된 등급 성적이 충분히 쌓였는데 50% 미만이면 그 등급의 신호를 막는다
@@ -1721,6 +1812,11 @@ function resetPatterns(){
 }
 
 function renderLib(a){
+  const matched = a.patterns.filter(p => p.key.startsWith('cat:'));
+  document.getElementById('catInfo').innerHTML =
+    `🧭 자동 카탈로그 <b>${CATALOG.length}개</b> (모양 ${CATALOG.filter(p=>p.type==='seq').length} · 열 주기 ${CATALOG.filter(p=>p.type==='len').length}) 상시 검사 중` +
+    ` — 지금 일치 <b>${S.catHits || 0}개</b>, 그중 표본이 가장 두터운 ${matched.length}개만 반영` +
+    (matched.length ? `: ${matched.map(p => p.name).join(', ')}` : '');
   const hitKeys = new Set(a.patterns.map(p => p.key));
   document.getElementById('lib').innerHTML = S.custom.map(p => {
     const m = a.patterns.find(x => x.key === 'lib:'+p.raw);
