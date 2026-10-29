@@ -277,11 +277,23 @@
       </div>
 
       <div class="panel">
-        <h2>5. 학습 데이터 (누적)</h2>
+        <h2>5. 격자 구조 스캔 · 슈 대조</h2>
+        <div class="roadlbl">지금 격자에서 찾은 도형</div>
+        <div class="plist" id="structList"></div>
+        <div class="roadlbl" style="margin-top:12px">지난 슈 대조</div>
+        <div id="archBox" style="font-size:12.5px;line-height:1.7"></div>
+        <div class="hint">도형이 잡힌 열은 빅로드에서 같은 색 테두리로 표시됩니다.
+          슈 대조는 <b>새 슈 시작</b>으로 보관된 지난 슈들에서 지금과 같은 모양이 나왔던 자리를 찾아
+          그 다음 판이 어떻게 됐는지 셉니다.</div>
+      </div>
+
+      <div class="panel">
+        <h2>6. 학습 데이터 (누적)</h2>
         <div class="cap">
           <div class="box"><div class="k">학습한 슈</div><div class="vv" id="lnShoe">0</div></div>
           <div class="box"><div class="k">누적 판수</div><div class="vv" id="lnHand">0</div></div>
           <div class="box"><div class="k">학습 패턴</div><div class="vv" id="lnPat">0</div></div>
+          <div class="box"><div class="k">보관 슈</div><div class="vv" id="lnArch">0</div></div>
         </div>
         <table id="lnGrade"><tbody></tbody></table>
         <table id="lnTable" style="margin-top:10px"><tbody></tbody></table>
@@ -296,14 +308,14 @@
       </div>
 
       <div class="panel">
-        <h2>6. 신호 기록</h2>
+        <h2>7. 신호 기록</h2>
         <table id="sigLog"><tbody></tbody></table>
         <div class="hint">봇이 신호를 띄운 라운드만 기록합니다. 실제 뱅커/플레이어 결과로 승패를 판정하고
           자산을 갱신합니다 (뱅커 적중 시 5% 커미션 차감, 타이는 무승부 처리).</div>
       </div>
 
       <div class="panel">
-        <h2>7. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
+        <h2>8. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
         <input id="patIn" placeholder="예: BBB · BPBP · 1-2-1-2" style="width:150px;background:rgba(0,0,0,.35);
           color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:5px 7px;font-size:12px">
         <button onclick="addPattern()">패턴 추가</button>
@@ -323,30 +335,30 @@
       </div>
 
       <div class="panel">
-        <h2>8. 감지된 패턴</h2>
+        <h2>9. 감지된 패턴</h2>
         <div class="plist" id="plist"></div>
       </div>
 
       <div class="panel">
-        <h2>9. 패턴별 실적 (백테스트)</h2>
+        <h2>10. 패턴별 실적 (백테스트)</h2>
         <table id="ptable"><tbody></tbody></table>
         <div class="hint">이 슈의 기록을 처음부터 되돌려(백테스트) 각 패턴이 실제로 몇 번 맞았는지 계산합니다.
           Wilson 95% 신뢰구간이 50%를 포함하면 <b>우연과 구분되지 않는다</b>는 뜻이며, 그런 패턴은 가중치가 자동으로 낮아집니다.</div>
       </div>
 
       <div class="panel">
-        <h2>10. 무작위성 검정</h2>
+        <h2>11. 무작위성 검정</h2>
         <table id="rand"><tbody></tbody></table>
         <div class="hint">런 검정 · 카이제곱 · 엔트로피로 "이 슈가 정말 무작위와 다른가"를 통계적으로 확인합니다.</div>
       </div>
 
       <div class="panel">
-        <h2>11. 슈 통계</h2>
+        <h2>12. 슈 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>12. 자금 관리 & 성적</h2>
+        <h2>13. 자금 관리 & 성적</h2>
         <div style="margin-bottom:10px">
           <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px" readonly
             title="패널 4의 현재 자산을 따릅니다">
@@ -370,7 +382,7 @@
       </div>
 
       <div class="panel">
-        <h2>13. 세션</h2>
+        <h2>14. 세션</h2>
         <button class="ghost" onclick="saveSession()">저장</button>
         <button class="ghost" onclick="loadSession()">불러오기</button>
         <button class="ghost" onclick="exportCSV()">CSV 내보내기</button>
@@ -404,6 +416,8 @@ const S = {
   watchTimer: null, watchSeen: -1,           // 로컬 워처 폴링
   capNow: null,         // 현재 자산 (신호 결과로 갱신)
   learn: {shoes:0, hands:0, patterns:{}, grades:{}, updated:null},  // 슈를 넘어 누적되는 학습 데이터
+  archive: [],          // 지난 슈 원본 (대조용)
+  archIdx: null, archIdxVer: -1,
   perf: {n:0, hit:0, pnl:0}
 };
 
@@ -1210,6 +1224,17 @@ function detectPatterns(hist){
           `높이 ${key} 뒤에 온 열 ${tot}개 중 ${bestC}개가 ${best}칸 — 이번 열 예상 ${best}칸 (현재 ${cur}칸)`);
   }
 
+  // 지난 슈 대조 — 같은 모양이 나왔던 자리에서 실제로 쭉 갔는지 꺾였는지
+  const am = matchArchive(nz);
+  if (am){
+    const go = am.f > am.b;
+    const margin = Math.abs(am.f - am.b) / am.tot;
+    add('archive', `📚 슈 대조 ${am.L}구간`, go ? side : OPP(side),
+        Math.min(0.30, margin*0.32 + am.tot*0.006),
+        `지난 ${S.archive.length}슈에서 같은 모양 ${am.tot}회 → 쭉 ${am.f} / 꺾임 ${am.b}` +
+        ` (${(Math.max(am.f,am.b)/am.tot*100).toFixed(0)}%)`);
+  }
+
   libraryDetect(hist, nz, done, cur, side, add);
 
   const tCnt = hist.slice(-12).filter(v => v === 'T').length;
@@ -1229,10 +1254,14 @@ function loadLearn(){
   try {
     const d = JSON.parse(localStorage.getItem(LEARN_KEY) || 'null');
     if (d && d.patterns) S.learn = d;
+    if (d && Array.isArray(d.archive)) S.archive = d.archive;
   } catch(e){}
 }
 function saveLearn(){
-  try { S.learn.updated = Date.now(); localStorage.setItem(LEARN_KEY, JSON.stringify(S.learn)); }
+  try {
+    S.learn.updated = Date.now();
+    localStorage.setItem(LEARN_KEY, JSON.stringify({...S.learn, archive:S.archive}));
+  }
   catch(e){}
 }
 
@@ -1252,6 +1281,9 @@ function commitShoe(silent){
     const G = S.learn.grades[g.grade] = S.learn.grades[g.grade] || {n:0, hit:0};
     G.n++; if (g.res === 'win') G.hit++;
   }
+  S.archive.push({seq: hist.join(''), ts: Date.now()});
+  if (S.archive.length > ARCH_CAP) S.archive = S.archive.slice(-ARCH_CAP);
+  S.archIdxVer = -1;
   S.learn.shoes++; S.learn.hands += hist.length;
   saveLearn();
 
@@ -1282,10 +1314,11 @@ function gradeStat(grade){
 function resetLearn(){
   if (!confirm('누적 학습 데이터를 모두 지웁니다. 되돌릴 수 없습니다. 진행할까요?')) return;
   S.learn = {shoes:0, hands:0, patterns:{}, grades:{}, updated:null};
+  S.archive = []; S.archIdxVer = -1;
   saveLearn(); render(); msg('학습 데이터를 초기화했습니다.');
 }
 function exportLearn(){
-  const url = URL.createObjectURL(new Blob([JSON.stringify(S.learn, null, 2)], {type:'application/json'}));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({...S.learn, archive:S.archive}, null, 2)], {type:'application/json'}));
   const el = document.createElement('a');
   el.href = url; el.download = `baccarat-learn-${Date.now()}.json`; el.click();
   URL.revokeObjectURL(url); msg('학습 데이터를 내려받았습니다.');
@@ -1310,13 +1343,105 @@ function importLearn(){
             G.n += v.n; G.hit += v.hit;
           }
           S.learn.shoes += d.shoes || 0; S.learn.hands += d.hands || 0;
-        } else S.learn = d;
+          if (Array.isArray(d.archive)) S.archive = S.archive.concat(d.archive).slice(-ARCH_CAP);
+        } else { S.learn = d; S.archive = Array.isArray(d.archive) ? d.archive : []; }
+        S.archIdxVer = -1;
         saveLearn(); render(); msg(`학습 데이터를 불러왔습니다 (${S.learn.shoes}슈).`);
       } catch(err){ msg('불러오기 실패: ' + err.message); }
     };
     fr.readAsText(f);
   };
   inp.click();
+}
+
+/* ---------------- 격자 구조 스캔 (6행 × N열 전체에서 도형 찾기) ---------------- */
+const STRUCT_STYLE = {
+  dragon:{c:'#ff7b85', t:'드래곤'}, tail:{c:'#ff4d5e', t:'드래곤 꼬리'},
+  pong:{c:'#79aaff', t:'핑퐁'},     dbl:{c:'#45e08a', t:'쌍줄'},
+  tri:{c:'#8fd66f', t:'삼줄'},      step:{c:'#e0c45e', t:'계단'},
+  block:{c:'#c89bf0', t:'같은 줄 반복'}
+};
+
+/* 열 높이 배열에서 구조를 찾아 [시작열, 끝열] 로 돌려준다 (1-based 열 번호) */
+function scanStructures(cols){
+  const L = cols.map(c => c.items.length);
+  const out = [];
+  const push = (type, from, to, note) => out.push({type, from:from+1, to:to+1, note,
+                                                   live: to === L.length - 1});
+
+  // 드래곤 — 한 열이 4칸 이상 (6칸 초과는 꼬리)
+  L.forEach((h, i) => {
+    if (h > 6) push('tail', i, i, `${h}칸 (6칸 넘겨 가로로 뻗음)`);
+    else if (h >= 4) push('dragon', i, i, `${h}칸`);
+  });
+
+  // 같은 높이가 연달아 이어지는 구간 — 1칸이면 핑퐁, 2칸 쌍줄, 3칸 삼줄, 그 외 반복
+  let i = 0;
+  while (i < L.length){
+    let j = i;
+    while (j + 1 < L.length && L[j+1] === L[i]) j++;
+    const run = j - i + 1;
+    const h = L[i];
+    if (h === 1 && run >= 3) push('pong', i, j, `${run}열 연속 교대`);
+    else if (h === 2 && run >= 2) push('dbl', i, j, `2칸 열 ${run}연속`);
+    else if (h === 3 && run >= 2) push('tri', i, j, `3칸 열 ${run}연속`);
+    else if (h >= 4 && run >= 2) push('block', i, j, `${h}칸 열 ${run}연속`);
+    i = j + 1;
+  }
+
+  // 계단 — 높이가 1씩 오르거나 내리는 3열 이상
+  i = 0;
+  while (i < L.length - 2){
+    for (const d of [1, -1]){
+      let j = i;
+      while (j + 1 < L.length && L[j+1] === L[j] + d && L[j+1] >= 1) j++;
+      if (j - i >= 2){
+        push('step', i, j, `${L.slice(i, j+1).join('→')} ${d > 0 ? '오름' : '내림'}`);
+        i = j; break;
+      }
+    }
+    i++;
+  }
+  return out.sort((a,b) => a.from - b.from || a.to - b.to);
+}
+
+/* ---------------- 슈 대조 (지난 슈들에서 같은 모양 찾기) ---------------- */
+const ARCH_MIN = 6, ARCH_MAX = 10, ARCH_CAP = 300;   // 대조 길이 / 보관 슈 수
+
+function buildArchiveIndex(){
+  if (S.archIdx && S.archIdxVer === S.archive.length) return S.archIdx;
+  const idx = {};
+  for (let L = ARCH_MIN; L <= ARCH_MAX; L++) idx[L] = new Map();
+  S.archive.forEach((sh, si) => {
+    const nz = sh.seq.split('').filter(v => v !== 'T');
+    for (let L = ARCH_MIN; L <= ARCH_MAX; L++){
+      for (let i = 0; i + L < nz.length; i++){
+        const a = nz[i];
+        let key = '';
+        for (let j = 0; j < L; j++) key += nz[i+j] === a ? 'A' : 'B';
+        let e = idx[L].get(key);
+        if (!e){ e = {f:0, b:0, ex:[]}; idx[L].set(key, e); }
+        (nz[i+L] === nz[i+L-1] ? e.f++ : e.b++);
+        if (e.ex.length < 4) e.ex.push({s: si + 1, p: i + L + 1, nx: nz[i+L]});
+      }
+    }
+  });
+  S.archIdx = idx; S.archIdxVer = S.archive.length;
+  return idx;
+}
+
+/* 지금 모양과 같은 자리를 지난 슈에서 찾는다 — 길수록 좋지만 표본이 없으면 줄여가며 */
+function matchArchive(nz){
+  if (!S.archive.length || nz.length < ARCH_MIN) return null;
+  const idx = buildArchiveIndex();
+  for (let L = Math.min(ARCH_MAX, nz.length); L >= ARCH_MIN; L--){
+    const a = nz[nz.length - L];
+    let key = '';
+    for (let j = 0; j < L; j++) key += nz[nz.length - L + j] === a ? 'A' : 'B';
+    const e = idx[L] && idx[L].get(key);
+    if (e && e.f + e.b >= 5) return {L, key, ...e, tot: e.f + e.b};
+  }
+  return null;
 }
 
 /* ---------------- 백테스트 (결과 분석 시스템) ---------------- */
@@ -1423,7 +1548,10 @@ function analyze(hist){
   })();
   const avgCol = lens.length ? lens.reduce((a,b)=>a+b,0)/lens.length : null;
 
-  return {pick, conf, patterns, bt, verdict, nB, nP, nT, streak, streakSide, altRate, contRate,
+  const structs = scanStructures(cols);
+  const arch = matchArchive(nz);
+  return {pick, conf, patterns, bt, verdict, structs, arch,
+          nB, nP, nT, streak, streakSide, altRate, contRate,
           avgCol, cols, beb, sr, cp, score,
           runs: runsTest(nz), chi: chiSquare(nB,nP), H: entropy(nz),
           ac2: autocorr(nz,2), ac3: autocorr(nz,3)};
@@ -1579,7 +1707,8 @@ function render(){
   /* 9. 자금 관리 */
   renderMoney(a);
 
-  drawRoad('bigRoad', a.cols);
+  drawRoad('bigRoad', a.cols, a.structs);
+  renderStructs(a);
   drawDerived('beb', a.beb); drawDerived('sr', a.sr); drawDerived('cp', a.cp);
 }
 
@@ -1635,11 +1764,19 @@ function renderMoney(a){
   }
 }
 
-function drawRoad(id, cols){
+function drawRoad(id, cols, structs){
   const el = document.getElementById(id); el.innerHTML='';
+  const start = Math.max(0, cols.length - 26);
   const view = cols.slice(-26);
-  for (const c of view){
+  view.forEach((c, vi) => {
+    const abs = start + vi + 1;                         // 1-based 실제 열 번호
+    const hit = (structs || []).filter(x => abs >= x.from && abs <= x.to);
     const d = document.createElement('div'); d.className='rcol';
+    if (hit.length){
+      const st = STRUCT_STYLE[hit[hit.length-1].type];
+      d.style.cssText = `outline:2px solid ${st.c};outline-offset:1px;border-radius:4px`;
+      d.title = hit.map(x => `${STRUCT_STYLE[x.type].t} (${x.note})`).join(' · ');
+    }
     for (let i=0;i<Math.min(c.items.length,6);i++){
       const s = document.createElement('div');
       s.className = 'cell ' + c.side;
@@ -1651,7 +1788,7 @@ function drawRoad(id, cols){
       s.textContent = '+'+(c.items.length-6); d.appendChild(s);
     }
     el.appendChild(d);
-  }
+  });
   if (!view.length) el.innerHTML = '<span style="font-size:12px;opacity:.5">-</span>';
 }
 
@@ -1764,6 +1901,7 @@ function renderLearn(a){
   document.getElementById('lnShoe').textContent = L.shoes;
   document.getElementById('lnHand').textContent = L.hands.toLocaleString();
   document.getElementById('lnPat').textContent = Object.keys(L.patterns).length;
+  document.getElementById('lnArch').textContent = S.archive.length;
 
   // 등급별 신호 성적 (학습 + 현재 슈)
   const gr = ['A','B','C'].map(g => {
@@ -1796,6 +1934,39 @@ function renderLearn(a){
   document.querySelector('#lnTable tbody').innerHTML = rows
     ? `<tr><th>패턴</th><th>누적 표본</th><th>적중률</th><th>95% CI</th><th>가중</th></tr>${rows}`
     : '<tr><td style="opacity:.5;font-size:12px">표본 10회 이상 쌓인 패턴이 아직 없습니다.</td></tr>';
+}
+
+
+function renderStructs(a){
+  const list = a.structs.slice().reverse().slice(0, 12);
+  document.getElementById('structList').innerHTML = list.length ? list.map(x => {
+    const st = STRUCT_STYLE[x.type];
+    const span = x.from === x.to ? `${x.from}열` : `${x.from}~${x.to}열`;
+    return `<div class="pit" style="border-left:3px solid ${st.c}">
+      <span class="tag" style="background:${st.c};color:#0e1220">${st.t}</span>
+      <div><div class="nm">${span}${x.live ? ' · 진행 중' : ''}</div>
+           <div class="ds">${x.note}</div></div></div>`;
+  }).join('') : '<div style="opacity:.5;font-size:12px">아직 잡힌 도형이 없습니다.</div>';
+
+  const box = document.getElementById('archBox');
+  if (!S.archive.length){
+    box.innerHTML = '<span style="opacity:.55">보관된 슈가 없습니다. 슈가 끝나면 ' +
+                    '<b>새 슈 시작</b>을 눌러 보관하세요 — 그때부터 대조가 가능합니다.</span>';
+    return;
+  }
+  const m = a.arch;
+  if (!m){
+    box.innerHTML = `<span style="opacity:.55">보관 ${S.archive.length}슈 · ` +
+                    `지금 모양과 같은 자리를 아직 못 찾았습니다 (최소 5회 필요).</span>`;
+    return;
+  }
+  const go = m.f > m.b, rate = Math.max(m.f, m.b)/m.tot;
+  box.innerHTML =
+    `보관 <b>${S.archive.length}슈</b>에서 최근 <b>${m.L}판 모양</b>과 같은 자리 <b>${m.tot}회</b><br>` +
+    `<span style="color:#45e08a">쭉 ${m.f}</span> / <span style="color:#ff7b85">꺾임 ${m.b}</span> → ` +
+    `<b>${go ? '이어감' : '끊김'} ${(rate*100).toFixed(0)}%</b>` +
+    `<div style="opacity:.6;font-size:11.5px;margin-top:4px">예시: ` +
+    m.ex.map(e => `${e.s}번 슈 ${e.p}판째 → ${e.nx === 'B' ? '뱅커' : '플레이어'}`).join(' · ') + '</div>';
 }
 
 /* ---------------- 자산 / 신호 기록 ---------------- */
