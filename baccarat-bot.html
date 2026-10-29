@@ -210,6 +210,7 @@
         <button class="p" onclick="manual('P')">플레이어 P</button>
         <button class="t" onclick="manual('T')">타이 T</button>
         <button class="ghost" onclick="undo()">되돌리기</button>
+        <button class="ghost" onclick="commitShoe()">새 슈 시작 (학습 반영)</button>
         <button class="ghost" onclick="resetAll()">전체 초기화</button>
         <div class="seq" id="seq" style="margin-top:10px">(기록 없음)</div>
       </div>
@@ -270,14 +271,33 @@
       </div>
 
       <div class="panel">
-        <h2>5. 신호 기록</h2>
+        <h2>5. 학습 데이터 (누적)</h2>
+        <div class="cap">
+          <div class="box"><div class="k">학습한 슈</div><div class="vv" id="lnShoe">0</div></div>
+          <div class="box"><div class="k">누적 판수</div><div class="vv" id="lnHand">0</div></div>
+          <div class="box"><div class="k">학습 패턴</div><div class="vv" id="lnPat">0</div></div>
+        </div>
+        <table id="lnGrade"><tbody></tbody></table>
+        <table id="lnTable" style="margin-top:10px"><tbody></tbody></table>
+        <div style="margin-top:10px">
+          <button class="ghost" onclick="exportLearn()">학습 내보내기</button>
+          <button class="ghost" onclick="importLearn()">가져오기</button>
+          <button class="ghost" onclick="resetLearn()">학습 초기화</button>
+        </div>
+        <div class="hint">결과를 입력할 때마다 현재 슈가 평가되고, <b>새 슈 시작</b>을 누르면 그 슈의 실적이
+          누적 학습에 합산되어 브라우저에 저장됩니다. 누적 표본이 쌓일수록 각 패턴의 가중치가 실제 적중률
+          쪽으로 조정되고, 한 등급의 학습 적중률이 30회 이상에서 48% 밑으로 떨어지면 그 등급 신호는 차단됩니다.</div>
+      </div>
+
+      <div class="panel">
+        <h2>6. 신호 기록</h2>
         <table id="sigLog"><tbody></tbody></table>
         <div class="hint">봇이 신호를 띄운 라운드만 기록합니다. 실제 뱅커/플레이어 결과로 승패를 판정하고
           자산을 갱신합니다 (뱅커 적중 시 5% 커미션 차감, 타이는 무승부 처리).</div>
       </div>
 
       <div class="panel">
-        <h2>6. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
+        <h2>7. 패턴 라이브러리 (쭉/꺾임 자동 판단)</h2>
         <input id="patIn" placeholder="예: BBB · BPBP · 1-2-1-2" style="width:150px;background:rgba(0,0,0,.35);
           color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:5px 7px;font-size:12px">
         <button onclick="addPattern()">패턴 추가</button>
@@ -292,30 +312,30 @@
       </div>
 
       <div class="panel">
-        <h2>7. 감지된 패턴</h2>
+        <h2>8. 감지된 패턴</h2>
         <div class="plist" id="plist"></div>
       </div>
 
       <div class="panel">
-        <h2>8. 패턴별 실적 (백테스트)</h2>
+        <h2>9. 패턴별 실적 (백테스트)</h2>
         <table id="ptable"><tbody></tbody></table>
         <div class="hint">이 슈의 기록을 처음부터 되돌려(백테스트) 각 패턴이 실제로 몇 번 맞았는지 계산합니다.
           Wilson 95% 신뢰구간이 50%를 포함하면 <b>우연과 구분되지 않는다</b>는 뜻이며, 그런 패턴은 가중치가 자동으로 낮아집니다.</div>
       </div>
 
       <div class="panel">
-        <h2>9. 무작위성 검정</h2>
+        <h2>10. 무작위성 검정</h2>
         <table id="rand"><tbody></tbody></table>
         <div class="hint">런 검정 · 카이제곱 · 엔트로피로 "이 슈가 정말 무작위와 다른가"를 통계적으로 확인합니다.</div>
       </div>
 
       <div class="panel">
-        <h2>10. 슈 통계</h2>
+        <h2>11. 슈 통계</h2>
         <table id="stats"><tbody></tbody></table>
       </div>
 
       <div class="panel">
-        <h2>11. 자금 관리 & 성적</h2>
+        <h2>12. 자금 관리 & 성적</h2>
         <div style="margin-bottom:10px">
           <label>뱅크롤</label><input type="number" id="bank" value="1000" min="1" style="width:80px" readonly
             title="패널 4의 현재 자산을 따릅니다">
@@ -339,7 +359,7 @@
       </div>
 
       <div class="panel">
-        <h2>12. 세션</h2>
+        <h2>13. 세션</h2>
         <button class="ghost" onclick="saveSession()">저장</button>
         <button class="ghost" onclick="loadSession()">불러오기</button>
         <button class="ghost" onclick="exportCSV()">CSV 내보내기</button>
@@ -371,6 +391,7 @@ const S = {
   src: 'video',         // 'video' = 화면 공유, 'img' = 사진
   sig: {log:[], pending:null, lastIdx:-99},  // 신호 기록 / 대기 중인 신호
   capNow: null,         // 현재 자산 (신호 결과로 갱신)
+  learn: {shoes:0, hands:0, patterns:{}, grades:{}, updated:null},  // 슈를 넘어 누적되는 학습 데이터
   perf: {n:0, hit:0, pnl:0}
 };
 
@@ -630,8 +651,12 @@ function gridToSequence(grid, rows, cols){
 function manual(v){ addResult(v); }
 function undo(){ S.history.pop(); S.lastRead=null; render(); }
 function resetAll(){
+  if (S.history.length >= 8 && confirm('현재 슈의 실적을 학습에 반영하고 초기화할까요?\n(취소하면 학습 없이 버립니다)')){
+    commitShoe(true);
+  }
   S.history=[]; S.lastRead=null; S.pendingRec=null; S.perf={n:0,hit:0,pnl:0,money:0};
-  S.bet={step:0,idx:0}; S.sig={log:[],pending:null,lastIdx:-99}; S.capNow=null; render();
+  S.bet={step:0,idx:0}; S.sig={log:[],pending:null,lastIdx:-99}; S.capNow=null;
+  btCache={key:null,val:null}; render();
 }
 
 function addResult(v){
@@ -1002,6 +1027,104 @@ function detectPatterns(hist){
   return out;
 }
 
+
+/* ---------------- 학습 데이터 (슈를 넘어 누적) ----------------
+   현재 슈의 실적은 백테스트가 매번 다시 계산하므로, 학습 저장소에는
+   "끝난 슈"만 합산한다. 그래야 같은 판이 두 번 세어지지 않는다. */
+const LEARN_KEY = 'baccarat-learn-v1';
+
+function loadLearn(){
+  try {
+    const d = JSON.parse(localStorage.getItem(LEARN_KEY) || 'null');
+    if (d && d.patterns) S.learn = d;
+  } catch(e){}
+}
+function saveLearn(){
+  try { S.learn.updated = Date.now(); localStorage.setItem(LEARN_KEY, JSON.stringify(S.learn)); }
+  catch(e){}
+}
+
+/* 현재 슈의 실적을 학습 저장소에 합산하고 슈를 비운다 */
+function commitShoe(silent){
+  const hist = S.history;
+  if (hist.length < 8){ if (!silent) alert('합산할 기록이 부족합니다 (8판 이상).'); return false; }
+  const bt = runBacktest(hist);
+
+  for (const [k, st] of Object.entries(bt.stats)){
+    const L = S.learn.patterns[k] = S.learn.patterns[k] || {name:st.name, n:0, hit:0};
+    L.n += st.n; L.hit += st.hit; L.name = st.name;
+  }
+  for (const g of S.sig.log){
+    if (g.res !== 'win' && g.res !== 'lose') continue;
+    const G = S.learn.grades[g.grade] = S.learn.grades[g.grade] || {n:0, hit:0};
+    G.n++; if (g.res === 'win') G.hit++;
+  }
+  S.learn.shoes++; S.learn.hands += hist.length;
+  saveLearn();
+
+  S.history = []; S.lastRead = null; S.stableCount = 0;
+  S.sig = {log:[], pending:null, lastIdx:-99};
+  S.bet = {step:0, idx:0};
+  btCache = {key:null, val:null};
+  render();
+  if (!silent) msg(`슈를 학습에 반영했습니다 (누적 ${S.learn.shoes}슈 / ${S.learn.hands}판). 자산과 학습은 유지됩니다.`);
+  return true;
+}
+
+/* 학습(과거 슈) + 현재 슈 백테스트를 합쳐 패턴의 실제 실력을 추정 */
+function pooledStat(key, shoeStat){
+  const L = S.learn.patterns[key];
+  const n   = (L ? L.n   : 0) + (shoeStat ? shoeStat.n   : 0);
+  const hit = (L ? L.hit : 0) + (shoeStat ? shoeStat.hit : 0);
+  return {n, hit, learnN: L ? L.n : 0, shoeN: shoeStat ? shoeStat.n : 0};
+}
+
+function gradeStat(grade){
+  const G = S.learn.grades[grade] || {n:0, hit:0};
+  const cur = S.sig.log.filter(x => x.grade === grade && (x.res === 'win' || x.res === 'lose'));
+  return {n: G.n + cur.length, hit: G.hit + cur.filter(x => x.res === 'win').length};
+}
+
+function resetLearn(){
+  if (!confirm('누적 학습 데이터를 모두 지웁니다. 되돌릴 수 없습니다. 진행할까요?')) return;
+  S.learn = {shoes:0, hands:0, patterns:{}, grades:{}, updated:null};
+  saveLearn(); render(); msg('학습 데이터를 초기화했습니다.');
+}
+function exportLearn(){
+  const url = URL.createObjectURL(new Blob([JSON.stringify(S.learn, null, 2)], {type:'application/json'}));
+  const el = document.createElement('a');
+  el.href = url; el.download = `baccarat-learn-${Date.now()}.json`; el.click();
+  URL.revokeObjectURL(url); msg('학습 데이터를 내려받았습니다.');
+}
+function importLearn(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const d = JSON.parse(fr.result);
+        if (!d || !d.patterns) throw new Error('형식이 올바르지 않습니다');
+        if (confirm('기존 학습에 합칠까요? (취소하면 덮어씁니다)')){
+          for (const [k, v] of Object.entries(d.patterns)){
+            const L = S.learn.patterns[k] = S.learn.patterns[k] || {name:v.name, n:0, hit:0};
+            L.n += v.n; L.hit += v.hit;
+          }
+          for (const [k, v] of Object.entries(d.grades || {})){
+            const G = S.learn.grades[k] = S.learn.grades[k] || {n:0, hit:0};
+            G.n += v.n; G.hit += v.hit;
+          }
+          S.learn.shoes += d.shoes || 0; S.learn.hands += d.hands || 0;
+        } else S.learn = d;
+        saveLearn(); render(); msg(`학습 데이터를 불러왔습니다 (${S.learn.shoes}슈).`);
+      } catch(err){ msg('불러오기 실패: ' + err.message); }
+    };
+    fr.readAsText(f);
+  };
+  inp.click();
+}
+
 /* ---------------- 백테스트 (결과 분석 시스템) ---------------- */
 let btCache = {key:null, val:null};
 
@@ -1043,7 +1166,9 @@ function runBacktest(hist){
 function adaptiveMult(st){
   if (!st || st.n < 6) return 1;
   const p = (st.hit + 2) / (st.n + 4);            // Agresti-Coull 축소추정
-  return Math.max(0, Math.min(1.8, 1 + 4*(p - 0.5)));
+  // 표본이 많을수록 조정 폭을 키운다 (적을 때 과잉 반응 방지)
+  const trust = Math.min(1, st.n / 60);
+  return Math.max(0, Math.min(1.8, 1 + 4*(p - 0.5)*trust));
 }
 
 /* ---------------- 종합 분석 ---------------- */
@@ -1062,10 +1187,10 @@ function analyze(hist){
   const bt = runBacktest(hist);
   const patterns = detectPatterns(hist);
   for (const p of patterns){
-    const st = bt.stats[p.key];
-    p.n = st ? st.n : 0; p.hit = st ? st.hit : 0;
-    p.rate = st && st.n ? st.hit/st.n : null;
-    p.ci = st && st.n ? wilson(st.hit, st.n) : null;
+    const st = pooledStat(p.key, bt.stats[p.key]);   // 과거 슈 학습 + 현재 슈
+    p.n = st.n; p.hit = st.hit; p.learnN = st.learnN; p.shoeN = st.shoeN;
+    p.rate = st.n ? st.hit/st.n : null;
+    p.ci = st.n ? wilson(st.hit, st.n) : null;
     p.mult = adaptiveMult(st);
     p.wEff = p.w * p.mult;
   }
@@ -1184,6 +1309,7 @@ function render(){
     : '신호 대기';
 
   renderCapital();
+  renderLearn(a);
 
   renderLib(a);
 
@@ -1379,14 +1505,29 @@ function evalSignal(a, hist){
     {k: proven ? '실적 검증된 패턴이 지지 (가산)' : '실적 검증 패턴 없음 (참고)', ok: proven, soft:true}
   ];
 
-  const fire = a.pick !== 'SKIP' && checks.every(c => c.soft || c.ok);
-  // 등급: 강도와 일치도로 결정
-  let grade = 'C';
-  if (Math.abs(a.score) >= 0.62 && agree >= 0.82) grade = 'A';
-  else if (Math.abs(a.score) >= 0.45 && agree >= 0.72) grade = 'B';
-  if (proven && grade !== 'A') grade = grade === 'B' ? 'A' : 'B';
+  // 학습된 등급 성적이 충분히 쌓였는데 50% 미만이면 그 등급의 신호를 막는다
+  const gs = gradeStat(grade0(a, agree));
+  if (gs.n >= 30){
+    const gr = gs.hit/gs.n;
+    checks.push({k:`학습된 ${grade0(a, agree)}급 적중률 ${(gr*100).toFixed(0)}% (${gs.hit}/${gs.n}) ≥ 48%`,
+                 ok: gr >= 0.48});
+  } else if (gs.n > 0){
+    checks.push({k:`학습된 ${grade0(a, agree)}급 표본 ${gs.n}회 (30회부터 게이트 적용)`, ok:true, soft:true});
+  }
 
-  return {fire, grade, checks, agree, nPat, need:cfg.score, strength:Math.abs(a.score)};
+  const grade = grade0(a, agree, proven);
+  const fire = a.pick !== 'SKIP' && checks.every(c => c.soft || c.ok);
+  return {fire, grade, checks, agree, nPat, need:cfg.score, strength:Math.abs(a.score),
+          gradeStat: gradeStat(grade)};
+}
+
+/* 등급: 강도와 일치도, 그리고 실적 검증 패턴 지지 여부로 결정 */
+function grade0(a, agree, proven){
+  let g = 'C';
+  if (Math.abs(a.score) >= 0.62 && agree >= 0.82) g = 'A';
+  else if (Math.abs(a.score) >= 0.45 && agree >= 0.72) g = 'B';
+  if (proven && g !== 'A') g = g === 'B' ? 'A' : 'B';
+  return g;
 }
 
 /* 신호가 떴을 때 알림 (진동 · 소리 · 알림창) */
@@ -1410,6 +1551,46 @@ function notifySignal(sg, pick, amt){
   } catch(e){}
 }
 
+
+
+function renderLearn(a){
+  const L = S.learn;
+  document.getElementById('lnShoe').textContent = L.shoes;
+  document.getElementById('lnHand').textContent = L.hands.toLocaleString();
+  document.getElementById('lnPat').textContent = Object.keys(L.patterns).length;
+
+  // 등급별 신호 성적 (학습 + 현재 슈)
+  const gr = ['A','B','C'].map(g => {
+    const st = gradeStat(g);
+    if (!st.n) return `<tr><th>${g}급 신호</th><td style="opacity:.5">표본 없음</td></tr>`;
+    const [lo,hi] = wilson(st.hit, st.n), rate = st.hit/st.n;
+    const col = lo > 0.5 ? '#45e08a' : hi < 0.5 ? '#ff7b85' : 'inherit';
+    return `<tr><th>${g}급 신호</th><td><span style="color:${col}">${(rate*100).toFixed(1)}%</span>
+      (${st.hit}/${st.n}) · 95% CI ${(lo*100).toFixed(0)}~${(hi*100).toFixed(0)}%
+      ${st.n >= 30 && rate < 0.48 ? '<b style="color:#ff7b85">· 차단됨</b>' : ''}</td></tr>`;
+  }).join('');
+  document.querySelector('#lnGrade tbody').innerHTML =
+    `<tr><th colspan="2" style="opacity:.6">등급별 신호 성적 (누적 + 현재 슈)</th></tr>${gr}`;
+
+  // 누적 표본이 많은 패턴 순
+  const keys = new Set([...Object.keys(L.patterns), ...Object.keys(a.bt.stats)]);
+  const rows = [...keys].map(k => {
+    const st = pooledStat(k, a.bt.stats[k]);
+    const name = (L.patterns[k] && L.patterns[k].name) || (a.bt.stats[k] && a.bt.stats[k].name) || k;
+    return {k, name, ...st};
+  }).filter(r => r.n >= 10).sort((x,y) => y.n - x.n).slice(0, 14).map(r => {
+    const [lo,hi] = wilson(r.hit, r.n), rate = r.hit/r.n;
+    const col = lo > 0.5 ? '#45e08a' : hi < 0.5 ? '#ff7b85' : 'inherit';
+    return `<tr><td>${r.name}</td>
+      <td>${r.n.toLocaleString()}<span style="opacity:.5;font-size:10px"> (슈 ${r.shoeN})</span></td>
+      <td style="color:${col}">${(rate*100).toFixed(1)}%</td>
+      <td style="opacity:.7">${(lo*100).toFixed(0)}~${(hi*100).toFixed(0)}%</td>
+      <td>×${adaptiveMult(r).toFixed(2)}</td></tr>`;
+  }).join('');
+  document.querySelector('#lnTable tbody').innerHTML = rows
+    ? `<tr><th>패턴</th><th>누적 표본</th><th>적중률</th><th>95% CI</th><th>가중</th></tr>${rows}`
+    : '<tr><td style="opacity:.5;font-size:12px">표본 10회 이상 쌓인 패턴이 아직 없습니다.</td></tr>';
+}
 
 /* ---------------- 자산 / 신호 기록 ---------------- */
 function renderCapital(){
@@ -1602,6 +1783,7 @@ document.getElementById('kelly').addEventListener('input', () => render());
 window.addEventListener('resize', applyBox);
 
 S.custom = DEFAULT_PATTERNS.map(parsePattern).filter(Boolean);
+loadLearn();
 render();
 </script>
 </body>
