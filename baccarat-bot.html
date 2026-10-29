@@ -194,6 +194,7 @@
             <div class="h sw" data-d="sw"></div><div class="h w" data-d="w"></div>
           </div>
         </div>
+        <div class="hint" id="autoMsg" style="color:#45e08a;opacity:.45">🤖 자동 판독을 켜면 결과 입력·베팅 정산·학습까지 손 안 대고 진행됩니다</div>
         <div class="hint" id="shareHint" style="color:#ffce8a"></div>
         <div class="hint">
           <b>영역 상자 만들기</b>를 누르면 초록 상자가 나타납니다.
@@ -607,9 +608,33 @@ function scanFrame(){
   const key = seq.join('');
   // 같은 판독이 2회 연속 나올 때만 확정 (프레임 노이즈 방지)
   if (key === S.lastRead) { S.stableCount++; } else { S.lastRead = key; S.stableCount = 1; }
-  if (S.stableCount === 2 && seq.length && key !== S.history.join('')) {
-    if (seq.length >= S.history.length) { S.history = seq; render(); }
+  if (S.stableCount !== 2 || !seq.length) return;
+
+  const curKey = S.history.join('');
+  if (key === curKey) return;
+
+  if (key.startsWith(curKey)){
+    const fresh = seq.slice(S.history.length);
+    // 처음 붙었을 때 이미 쌓여 있던 판은 "우리가 건 베팅"이 아니므로 정산 없이 싣는다
+    if (fresh.length > 3){ S.history = seq; S.sig.pending = null; render(); autoNote(`기존 ${seq.length}판을 불러왔습니다`); }
+    else {
+      // 새로 나온 결과만 정식 입력 경로로 → 베팅 정산·자산·학습까지 자동 반영
+      for (const v of fresh) addResult(v);
+      autoNote(`새 결과 ${fresh.map(x => x === 'B' ? '뱅커' : x === 'P' ? '플레이어' : '타이').join(', ')} 자동 반영`);
+    }
+  } else if (seq.length >= S.history.length){
+    S.history = seq; S.sig.pending = null; render();   // 판독이 어긋나면 통째로 교체
+    autoNote('판독이 달라져 기록을 다시 맞췄습니다');
   }
+}
+
+function autoNote(t){
+  const el = document.getElementById('autoMsg');
+  if (!el) return;
+  el.textContent = `🤖 ${new Date().toLocaleTimeString()} · ${t}`;
+  el.style.opacity = 1;
+  clearTimeout(autoNote.t);
+  autoNote.t = setTimeout(() => el.style.opacity = .45, 4000);
 }
 
 // 셀 중앙부를 샘플링해 색 분류
