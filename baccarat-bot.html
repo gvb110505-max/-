@@ -173,6 +173,9 @@
         <h2>1. 화면 공유 & 영역 지정</h2>
         <button id="btnShare">화면 공유 시작</button>
         <button id="btnPhoto" class="ghost">📷 사진으로 판독</button>
+        <button id="btnWatch" class="ghost" onclick="toggleWatcher()">🖥 로컬 워처 연결</button>
+        <input id="watchPort" value="8787" style="width:62px;background:rgba(0,0,0,.35);color:#fff;
+          border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 6px;font-size:12px">
         <input type="file" id="fileIn" accept="image/*" style="display:none">
         <button id="btnStop" class="ghost" disabled>중지</button>
         <button id="btnBox" class="ghost" disabled>영역 상자 만들기</button>
@@ -195,6 +198,8 @@
           </div>
         </div>
         <div class="hint" id="autoMsg" style="color:#45e08a;opacity:.45">🤖 자동 판독을 켜면 결과 입력·베팅 정산·학습까지 손 안 대고 진행됩니다</div>
+        <div class="hint">PC에서 <code>python3 baccarat_watcher.py</code> 를 띄우면 화면 공유 없이도
+          로컬 워처가 로드맵을 계속 읽어 보냅니다. 워처는 <b>읽기만</b> 하며 베팅을 대신 누르지 않습니다.</div>
         <div class="hint" id="shareHint" style="color:#ffce8a"></div>
         <div class="hint">
           <b>영역 상자 만들기</b>를 누르면 초록 상자가 나타납니다.
@@ -396,6 +401,7 @@ const S = {
   bet: {step:0, idx:0}, // 진행형 베팅 전략 단계
   src: 'video',         // 'video' = 화면 공유, 'img' = 사진
   sig: {log:[], pending:null, lastIdx:-99},  // 신호 기록 / 대기 중인 신호
+  watchTimer: null, watchSeen: -1,           // 로컬 워처 폴링
   capNow: null,         // 현재 자산 (신호 결과로 갱신)
   learn: {shoes:0, hands:0, patterns:{}, grades:{}, updated:null},  // 슈를 넘어 누적되는 학습 데이터
   perf: {n:0, hit:0, pnl:0}
@@ -609,23 +615,32 @@ function scanFrame(){
   // 같은 판독이 2회 연속 나올 때만 확정 (프레임 노이즈 방지)
   if (key === S.lastRead) { S.stableCount++; } else { S.lastRead = key; S.stableCount = 1; }
   if (S.stableCount !== 2 || !seq.length) return;
+  ingestSequence(seq);
+}
 
+/* 판독된 결과 시퀀스를 기록에 반영한다 (화면 판독 · 로컬 워처 공용) */
+function ingestSequence(seq){
+  const key = seq.join ? seq.join('') : String(seq);
+  const arr = key.split('');
   const curKey = S.history.join('');
-  if (key === curKey) return;
+  if (key === curKey) return false;
 
   if (key.startsWith(curKey)){
-    const fresh = seq.slice(S.history.length);
+    const fresh = arr.slice(S.history.length);
     // 처음 붙었을 때 이미 쌓여 있던 판은 "우리가 건 베팅"이 아니므로 정산 없이 싣는다
-    if (fresh.length > 3){ S.history = seq; S.sig.pending = null; render(); autoNote(`기존 ${seq.length}판을 불러왔습니다`); }
-    else {
+    if (fresh.length > 3){
+      S.history = arr; S.sig.pending = null; render();
+      autoNote(`기존 ${arr.length}판을 불러왔습니다`);
+    } else {
       // 새로 나온 결과만 정식 입력 경로로 → 베팅 정산·자산·학습까지 자동 반영
       for (const v of fresh) addResult(v);
       autoNote(`새 결과 ${fresh.map(x => x === 'B' ? '뱅커' : x === 'P' ? '플레이어' : '타이').join(', ')} 자동 반영`);
     }
-  } else if (seq.length >= S.history.length){
-    S.history = seq; S.sig.pending = null; render();   // 판독이 어긋나면 통째로 교체
+  } else if (arr.length >= S.history.length){
+    S.history = arr; S.sig.pending = null; render();
     autoNote('판독이 달라져 기록을 다시 맞췄습니다');
-  }
+  } else return false;
+  return true;
 }
 
 function autoNote(t){
@@ -1928,6 +1943,49 @@ function renderLib(a){
       <span style="opacity:.7">${p.type === 'len' ? '열' : '모양'}${tail}</span>
       <i onclick="removePattern('${p.raw}')">✕</i></span>`;
   }).join('') || '<span style="font-size:12px;opacity:.5">등록된 패턴이 없습니다.</span>';
+}
+
+
+/* ---------------- 로컬 워처 연결 (baccarat_watcher.py) ---------------- */
+function watcherUrl(){
+  const v = (document.getElementById('watchPort').value || '8787').trim();
+  return /^https?:\/\//.test(v) ? v.replace(/\/$/,'') : `http://localhost:${v}`;
+}
+
+async function toggleWatcher(){
+  const btn = document.getElementById('btnWatch');
+  if (S.watchTimer){
+    clearInterval(S.watchTimer); S.watchTimer = null;
+    btn.textContent = '🖥 로컬 워처 연결'; btn.classList.add('ghost');
+    autoNote('로컬 워처 연결을 끊었습니다');
+    return;
+  }
+  try {
+    const r = await fetch(watcherUrl() + '/state', {cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await r.json();
+  } catch(e){
+    alert('로컬 워처에 연결하지 못했습니다.\n\n' +
+          'PC에서 먼저 실행하세요:\n  python3 baccarat_watcher.py\n\n' + e.message);
+    return;
+  }
+  btn.textContent = '🖥 워처 연결 중 (끊기)'; btn.classList.remove('ghost');
+  S.watchSeen = -1;
+  S.watchTimer = setInterval(pollWatcher, 1000);
+  pollWatcher();
+}
+
+async function pollWatcher(){
+  try {
+    const r = await fetch(watcherUrl() + '/state', {cache:'no-store'});
+    const d = await r.json();
+    if (d.error) { autoNote('워처 판독 오류: ' + d.error); return; }
+    if (!d.results || d.updated === S.watchSeen) return;
+    S.watchSeen = d.updated;
+    ingestSequence(d.results.split(''));
+  } catch(e){
+    autoNote('워처 응답 없음 — 연결을 확인하세요');
+  }
 }
 
 /* ---------------- 세션 저장 / 내보내기 ---------------- */
